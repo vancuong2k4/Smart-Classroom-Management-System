@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS attendance_records;
+DROP TYPE IF EXISTS attendance_status;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS enrollments;
+DROP TABLE IF EXISTS courses;
+DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS user_role;
