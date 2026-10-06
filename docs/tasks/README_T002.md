@@ -121,5 +121,5 @@ erDiagram
 
 ## 5. ⚠️ Lưu ý & Việc còn tồn đọng
 - [ ] Bảng `users` chỉ có `username`, chưa có `full_name` / `email` / `student_code`. Nếu Dashboard cần hiển thị tên SV → thêm bằng migration mới.
-- [ ] Bảng `courses` chưa có cột giảng viên phụ trách (`lecturer_id`) — cần cân nhắc khi làm module Courses.
+- [x] Bảng `courses` chưa có cột giảng viên phụ trách (`lecturer_id`) → **đã thêm ở T004** (migration `20261005173112-add-lecturer-to-courses`).
 - [ ] Chưa tạo **spatial index** (`GIST`) cho cột `location` — chưa cần thiết với dữ liệu nhỏ, có thể bổ sung sau.

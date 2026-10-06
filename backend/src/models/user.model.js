@@ -37,6 +37,17 @@ const findById = async (id) => {
     return rows[0] || null;
 };
 
+/**
+ * Tìm nhiều user cùng lúc theo danh sách username (1 câu query thay vì N câu).
+ */
+const findByUsernames = async (usernames) => {
+    const { rows } = await pool.query(
+        `SELECT ${PUBLIC_COLUMNS} FROM users WHERE username = ANY($1::varchar[])`,
+        [usernames]
+    );
+    return rows;
+};
+
 const create = async ({ username, passwordHash, role }) => {
     const { rows } = await pool.query(
         `INSERT INTO users (username, password_hash, role)
@@ -51,5 +62,6 @@ module.exports = {
     findByUsernameWithPassword,
     findByUsername,
     findById,
+    findByUsernames,
     create,
 };

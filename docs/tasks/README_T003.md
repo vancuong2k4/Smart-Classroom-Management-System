@@ -142,7 +142,7 @@ Sau `authenticate`, controller dùng được `req.user = { id, role }`.
 - [ ] **Đổi `JWT_SECRET` trong `.env`** (đang là giá trị mẫu). Tạo chuỗi ngẫu nhiên:
   `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
 - [ ] Có 1 user test (`test_32470`, id=1) trong DB từ lúc kiểm thử → xóa nếu muốn: `DELETE FROM users WHERE username LIKE 'test_%';`
-- [ ] Chưa có script seed tài khoản **ADMIN** → dự kiến làm ở T004.
+- [x] Chưa có script seed tài khoản **ADMIN** → **đã làm ở T004** (`npm run seed:admin`).
 - [ ] Chưa có cơ chế logout / refresh token / thu hồi token (token hợp lệ đến khi hết hạn `1d`).
 - [ ] Chưa có rate limiting cho `/login` (chống brute-force) — nên bổ sung trước khi deploy.
 - [ ] Chưa có unit test tự động (hiện mới kiểm thử thủ công).

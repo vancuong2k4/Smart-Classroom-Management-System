@@ -7,9 +7,7 @@ const jwt = require('jsonwebtoken');
 const userModel = require('../models/user.model');
 const jwtConfig = require('../config/jwt');
 const AppError = require('../utils/AppError');
-
-// Mã lỗi PostgreSQL khi vi phạm ràng buộc UNIQUE
-const PG_UNIQUE_VIOLATION = '23505';
+const PG_ERROR = require('../utils/pgErrors');
 
 /**
  * Hash giả dùng khi username không tồn tại.
@@ -35,10 +33,11 @@ const generateToken = (user) => {
 };
 
 /**
- * Đăng ký tài khoản mới.
- * @returns {Promise<{user: object, token: string}>}
+ * Tạo tài khoản (mã hóa mật khẩu + lưu DB). KHÔNG kiểm tra quyền.
+ * Dùng chung cho: API đăng ký (register) và script seed tài khoản ADMIN.
+ * @returns {Promise<object>} user (không có password_hash)
  */
-const register = async ({ username, password, role }) => {
+const createAccount = async ({ username, password, role }) => {
     const existing = await userModel.findByUsername(username);
     if (existing) {
         throw new AppError('Username already exists', 409);
@@ -48,18 +47,24 @@ const register = async ({ username, password, role }) => {
     // nên 2 user cùng mật khẩu vẫn có hash khác nhau.
     const passwordHash = await bcrypt.hash(password, jwtConfig.saltRounds);
 
-    let user;
     try {
-        user = await userModel.create({ username, passwordHash, role });
+        return await userModel.create({ username, passwordHash, role });
     } catch (err) {
         // Phòng trường hợp 2 request đăng ký cùng username chạy song song (race condition):
         // cả hai đều qua bước kiểm tra ở trên, nhưng DB UNIQUE constraint sẽ chặn request thứ 2.
-        if (err.code === PG_UNIQUE_VIOLATION) {
+        if (err.code === PG_ERROR.UNIQUE_VIOLATION) {
             throw new AppError('Username already exists', 409);
         }
         throw err;
     }
+};
 
+/**
+ * Đăng ký tài khoản mới.
+ * @returns {Promise<{user: object, token: string}>}
+ */
+const register = async ({ username, password, role }) => {
+    const user = await createAccount({ username, password, role });
     return { user, token: generateToken(user) };
 };
 
@@ -109,6 +114,7 @@ const getCurrentUser = async (userId) => {
 };
 
 module.exports = {
+    createAccount,
     register,
     login,
     verifyToken,
