@@ -10,6 +10,10 @@ Mỗi Task sau khi hoàn thành sẽ có 1 file `README_TXXX.md` trong thư mụ
 | T002 | Khởi tạo Database và Migration | Backend / DB | ✅ Hoàn thành | [README_T002.md](./README_T002.md) |
 | T003 | Module Authentication & Authorization | Backend | ✅ Hoàn thành | [README_T003.md](./README_T003.md) |
 | T004 | Seed Admin & Quản lý Lớp học (Courses / Enrollments) | Backend | ✅ Hoàn thành | [README_T004.md](./README_T004.md) |
+| T005 | Phiên điểm danh & Mã QR động (Dynamic QR via WebSockets) | Backend | ✅ Hoàn thành | [README_T005.md](./README_T005.md) |
+| T006 | Xử lý điểm danh Sinh viên (Student Check-in) | Backend | ✅ Hoàn thành | [README_T006.md](./README_T006.md) |
+| T007 | Thống kê & Báo cáo Điểm danh (Analytics & Reporting) | Backend | ✅ Hoàn thành | [README_T007.md](./README_T007.md) |
+| T008 | Tối ưu Bảo mật & Đóng gói Môi trường (Docker) | DevOps | ✅ Hoàn thành | [README_T008.md](./README_T008.md) |
 
 ## Cấu trúc chuẩn của một file README_TXXX.md
 1. **Bảng thông tin** — Task ID, Stream, Epic, Người phụ trách, Trạng thái, Definition of Done

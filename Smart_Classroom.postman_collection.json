@@ -1,0 +1,182 @@
+{
+  "info": {
+    "name": "Smart Classroom (Full Flow T001-T007)",
+    "description": "Toàn bộ API được thiết lập tự động truyền Token và ID cho nhau.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "courseId", "value": "", "type": "string" },
+    { "key": "studentUsername", "value": "", "type": "string" },
+    { "key": "studentToken", "value": "", "type": "string" },
+    { "key": "sessionId", "value": "", "type": "string" },
+    { "key": "qrToken", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. [Admin] Đăng nhập",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "if(json.status === 'success') {",
+              "    pm.collectionVariables.set('adminToken', json.data.token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": { "mode": "raw", "raw": "{\"username\": \"admin\", \"password\": \"1234567890\"}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+      }
+    },
+    {
+      "name": "2. [Admin] Tạo Lớp học",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "if(json.status === 'success') {",
+              "    pm.collectionVariables.set('courseId', json.data.course.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+        "body": { "mode": "raw", "raw": "{\"code\": \"INT123_{{$timestamp}}\", \"name\": \"Test Postman\"}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/courses", "host": ["{{baseUrl}}"], "path": ["courses"] }
+      }
+    },
+    {
+      "name": "3. [Student] Đăng ký SV ngẫu nhiên",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [ "pm.collectionVariables.set('studentUsername', 'sv_' + Date.now());" ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "if(json.status === 'success') {",
+              "    pm.collectionVariables.set('studentToken', json.data.token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": { "mode": "raw", "raw": "{\"username\": \"{{studentUsername}}\", \"password\": \"Password123!\", \"role\": \"STUDENT\"}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+      }
+    },
+    {
+      "name": "4. [Admin] Thêm SV vào Lớp",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+        "body": { "mode": "raw", "raw": "{\"usernames\": [\"{{studentUsername}}\"]}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/courses/{{courseId}}/students", "host": ["{{baseUrl}}"], "path": ["courses", "{{courseId}}", "students"] }
+      }
+    },
+    {
+      "name": "5. [Admin] Mở phiên Điểm danh",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "if(json.status === 'success') {",
+              "    pm.collectionVariables.set('sessionId', json.data.session.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+        "body": { "mode": "raw", "raw": "{\"latitude\": 21.0285, \"longitude\": 105.8542, \"ip_range\": \"192.168.1.0/24\", \"radius_meters\": 50}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/courses/{{courseId}}/sessions", "host": ["{{baseUrl}}"], "path": ["courses", "{{courseId}}", "sessions"] }
+      }
+    },
+    {
+      "name": "6. [Dev] Giả lập Máy chiếu quét mã QR",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "if(json.status === 'success') {",
+              "    pm.collectionVariables.set('qrToken', json.data.token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/sessions/{{sessionId}}/dev-qr", "host": ["{{baseUrl}}"], "path": ["sessions", "{{sessionId}}", "dev-qr"] }
+      }
+    },
+    {
+      "name": "7. [Student] Gọi API Điểm Danh",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{studentToken}}" } ],
+        "body": { "mode": "raw", "raw": "{\"token\": \"{{qrToken}}\", \"latitude\": 21.0285, \"longitude\": 105.8542, \"ip_address\": \"192.168.1.15\"}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/attendance/checkin", "host": ["{{baseUrl}}"], "path": ["attendance", "checkin"] }
+      }
+    },
+    {
+      "name": "8. [Report] Admin Xem Báo cáo Lớp",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/reports/courses/{{courseId}}", "host": ["{{baseUrl}}"], "path": ["reports", "courses", "{{courseId}}"] }
+      }
+    },
+    {
+      "name": "9. [Report] Admin Xuất CSV Báo Cáo",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/reports/courses/{{courseId}}/export", "host": ["{{baseUrl}}"], "path": ["reports", "courses", "{{courseId}}", "export"] },
+        "description": "Nhấn nút mũi tên cạnh Send -> Chọn Send and Download"
+      }
+    },
+    {
+      "name": "10. [Report] Student Xem Lịch sử",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{studentToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/reports/me?courseId={{courseId}}", "host": ["{{baseUrl}}"], "path": ["reports", "me"], "query": [ { "key": "courseId", "value": "{{courseId}}" } ] }
+      }
+    }
+  ]
+}

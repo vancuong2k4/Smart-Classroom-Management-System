@@ -28,6 +28,15 @@ router.patch('/:id', authorize(ADMIN, LECTURER), validateIdParams('id'), validat
 // DELETE /api/courses/:id   - Xóa lớp (CHỈ ADMIN vì xóa cascade cả lịch sử điểm danh)
 router.delete('/:id', authorize(ADMIN), validateIdParams('id'), courseController.remove);
 
+// ===== Sessions (Phiên điểm danh) =====
+const sessionController = require('../controllers/session.controller');
+const { validateOpenSession } = require('../validators/session.validator');
+
+// POST   /api/courses/:id/sessions             - Mở phiên điểm danh
+router.post('/:id/sessions', authorize(ADMIN, LECTURER), validateIdParams('id'), validateOpenSession, sessionController.open);
+// GET    /api/courses/:id/sessions             - Lịch sử các phiên
+router.get('/:id/sessions', validateIdParams('id'), sessionController.list);
+
 // ===== Enrollments (SV trong lớp) =====
 // GET    /api/courses/:id/students             - Danh sách SV
 router.get('/:id/students', authorize(ADMIN, LECTURER), validateIdParams('id'), enrollmentController.list);

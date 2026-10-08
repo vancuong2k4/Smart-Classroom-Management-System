@@ -2,6 +2,8 @@ require('dotenv').config();
 const http = require('http');
 const app = require('./app');
 const { Server } = require('socket.io');
+const { connectRedis } = require('./config/redis');
+const setupSocket = require('./sockets');
 
 const PORT = process.env.PORT || 3000;
 
@@ -15,15 +17,19 @@ const io = new Server(server, {
     }
 });
 
-// Socket.IO Connection Event
-io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
-    
-    socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
-    });
-});
+// Setup Websocket logic
+setupSocket(io);
 
-server.listen(PORT, () => {
-    console.log(`🚀 Server is running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+const startServer = async () => {
+    try {
+        await connectRedis();
+        server.listen(PORT, () => {
+            console.log(`🚀 Server is running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    }
+};
+
+startServer();

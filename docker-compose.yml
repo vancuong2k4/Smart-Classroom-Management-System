@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # 1. Cơ sở dữ liệu PostgreSQL (Tích hợp sẵn PostGIS)
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: smartclass-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mysecretpassword}
+      POSTGRES_DB: ${DB_NAME:-smart_classroom}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # 2. Redis (Cache & Pub/Sub)
+  redis:
+    image: redis:alpine
+    container_name: smartclass-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # 3. Backend (Node.js API)
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartclass-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-mysecretpassword}
+      - DB_NAME=${DB_NAME:-smart_classroom}
+      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_smart_classroom_prod}
+      - REDIS_URL=redis://redis:6379
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=adminpassword123
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    # Khi container Backend khởi chạy: Chờ cài đặt DB, chạy db-migrate up, seed admin rồi mới start app
+    command: sh -c "npx db-migrate up && npm run seed:admin && npm start"
+
+volumes:
+  pgdata:
