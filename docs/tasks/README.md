@@ -15,6 +15,8 @@ Mỗi Task sau khi hoàn thành sẽ có 1 file `README_TXXX.md` trong thư mụ
 | T007 | Thống kê & Báo cáo Điểm danh (Analytics & Reporting) | Backend | ✅ Hoàn thành | [README_T007.md](./README_T007.md) |
 | T008 | Tối ưu Bảo mật & Đóng gói Môi trường (Docker) | DevOps | ✅ Hoàn thành | [README_T008.md](./README_T008.md) |
 
+| T013 | Khởi tạo Mobile App và đăng nhập API | Mobile | Chờ review | [README_T013.md](./README_T013.md) |
+
 ## Cấu trúc chuẩn của một file README_TXXX.md
 1. **Bảng thông tin** — Task ID, Stream, Epic, Người phụ trách, Trạng thái, Definition of Done
 2. **Mục tiêu**

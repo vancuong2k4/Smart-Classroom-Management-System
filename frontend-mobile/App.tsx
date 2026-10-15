@@ -24,7 +24,7 @@ import {
   View,
 } from 'react-native';
 
-const API_URL = 'http://192.168.1.2:3000/api';
+const API_URL = 'http://192.168.1.7:3000/api';
 const TOKEN_KEY = 'smartclass_token';
 const BLUE = '#1765EE';
 
