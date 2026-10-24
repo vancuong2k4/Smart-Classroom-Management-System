@@ -36,6 +36,8 @@ const { validateOpenSession } = require('../validators/session.validator');
 router.post('/:id/sessions', authorize(ADMIN, LECTURER), validateIdParams('id'), validateOpenSession, sessionController.open);
 // GET    /api/courses/:id/sessions             - Lịch sử các phiên
 router.get('/:id/sessions', validateIdParams('id'), sessionController.list);
+// POST   /api/courses/:id/sessions/:sessionId/close - Đóng sớm phiên điểm danh (alias hỗ trợ frontend)
+router.post('/:id/sessions/:sessionId/close', authorize(ADMIN, LECTURER), validateIdParams('id', 'sessionId'), sessionController.close);
 
 // ===== Enrollments (SV trong lớp) =====
 // GET    /api/courses/:id/students             - Danh sách SV
