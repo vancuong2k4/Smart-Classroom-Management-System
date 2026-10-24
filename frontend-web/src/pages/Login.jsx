@@ -19,13 +19,17 @@ function Login({ onLoginSuccess }) {
     try {
       const response = await axiosClient.post('/auth/login', { username, password });
       
-      const token = response.data?.token || response.data?.accessToken || 'mock-jwt-token-2026';
-      const userData = response.data?.user || {
+      const token = response.data?.token || response?.token || response.data?.accessToken || response?.accessToken;
+      const userData = response.data?.user || response?.user || {
         fullName: 'Giảng viên',
         username: username,
         role: 'Giảng viên',
         code: 'GV-2026'
       };
+
+      if (!token) {
+        throw new Error('Không nhận được mã xác thực (token) từ máy chủ.');
+      }
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
@@ -35,23 +39,13 @@ function Login({ onLoginSuccess }) {
       }
       navigate('/courses', { replace: true });
     } catch (err) {
-      console.warn('API chưa khả dụng hoặc báo lỗi, khởi chạy chế độ dự phòng:', err);
-      
-      const mockToken = 'mock-jwt-token-2026';
-      const mockUser = {
-        fullName: 'Giảng viên',
-        username: username,
-        role: 'Giảng viên',
-        code: 'GV-2026'
-      };
-
-      localStorage.setItem('token', mockToken);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-
-      if (onLoginSuccess) {
-        onLoginSuccess(mockToken);
-      }
-      navigate('/courses', { replace: true });
+      console.error('Đăng nhập thất bại:', err);
+      const message =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.';
+      setErrorMessage(message);
     } finally {
       setLoading(false);
     }
