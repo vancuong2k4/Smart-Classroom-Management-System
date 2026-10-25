@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import {
   createBottomTabNavigator,
   BottomTabScreenProps,
@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,7 +25,7 @@ import {
   View,
 } from 'react-native';
 
-const API_URL = 'http://192.168.1.7:3000/api';
+const API_URL = 'http://192.168.1.6:3000/api';
 const TOKEN_KEY = 'smartclass_token';
 const BLUE = '#1765EE';
 
@@ -79,14 +80,115 @@ function ScanScreen() {
   );
 }
 
+type Course = {
+  id: number; code: string; name: string; lecturer_username: string | null;
+};
+type Attendance = {
+  course_id: number; course_code: string; course_name: string;
+  session_id: number; start_time: string; status: string;
+  checked_in_at: string | null;
+};
+
+async function getData(path: string, signal: AbortSignal) {
+  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+  if (!token) throw new Error('Phiên đăng nhập không còn. Hãy đăng xuất và đăng nhập lại.');
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token}` }, signal,
+  });
+  if (response.status === 401) throw new Error('Phiên đã hết hạn. Hãy đăng xuất và đăng nhập lại.');
+  if (response.status === 403) throw new Error('Tài khoản không có quyền xem dữ liệu này.');
+  if (!response.ok) throw new Error('Không tải được dữ liệu. Vui lòng thử lại.');
+  const result = await response.json();
+  return result.data;
+}
+
+// Tải khi mở tab; hủy yêu cầu khi rời tab hoặc đăng xuất.
+function useStudentData<T>(path: string, field: string) {
+  const [items, setItems] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  useFocusEffect(useCallback(() => {
+    const controller = new AbortController();
+    let active = true;
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    setLoading(true);
+    setError('');
+    getData(path, controller.signal).then(data => {
+      if (!Array.isArray(data?.[field])) throw new Error('Dữ liệu máy chủ chưa hợp lệ.');
+      if (active) setItems(data[field]);
+    }).catch(err => {
+      if (active) setError(controller.signal.aborted
+        ? 'Kết nối quá thời gian. Vui lòng thử lại.'
+        : err instanceof Error ? err.message : 'Không kết nối được máy chủ.');
+    }).finally(() => {
+      clearTimeout(timeout);
+      if (active) setLoading(false);
+    });
+    return () => { active = false; clearTimeout(timeout); controller.abort(); };
+  }, [path, field, revision]));
+  return { items, loading, error, refresh: () => setRevision(value => value + 1) };
+}
+
+function DataMessage({ loading, error, empty, onRetry }: {
+  loading: boolean; error: string; empty: string; onRetry: () => void;
+}) {
+  if (loading) return <ActivityIndicator color={BLUE} style={{ margin: 16 }} />;
+  if (error) return <View style={s.dataCard}>
+    <Text style={s.errorText}>{error}</Text>
+    <Pressable onPress={onRetry}><Text style={s.retryText}>Thử lại</Text></Pressable>
+  </View>;
+  return <Text style={s.actionSubtitle}>{empty}</Text>;
+}
+
+const statusLabels: Record<string, { label: string; color: string }> = {
+  PRESENT: { label: 'Có mặt', color: '#15803D' },
+  LATE: { label: 'Đi muộn', color: '#A16207' },
+  ABSENT: { label: 'Vắng', color: '#B91C1C' },
+  INVALID_LOCATION: { label: 'Không hợp lệ vị trí', color: '#C2410C' },
+};
+function dateLabel(value: string | null) {
+  if (!value) return 'Chưa có thời gian';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Thời gian không hợp lệ' : date.toLocaleString('vi-VN');
+}
+
 function HistoryScreen() {
-  return (
-    <EmptyScreen
-      icon="time-outline"
-      title="Lịch sử điểm danh"
-      description="Tính năng lịch sử đang được chuẩn bị. Kết quả điểm danh của bạn sẽ được hiển thị tại đây."
-    />
-  );
+  const { items, loading, error, refresh } = useStudentData<Attendance>('/reports/me', 'history');
+  const [courseId, setCourseId] = useState<number | null>(null);
+  const courses = Array.from(new Map(items.map(item => [item.course_id, {
+    id: item.course_id, name: item.course_name, code: item.course_code,
+  }])).values());
+  const selected = courses.some(course => course.id === courseId) ? courseId : null;
+  const visible = selected === null ? items : items.filter(item => item.course_id === selected);
+  return <SafeAreaView style={s.screen} edges={['top']}>
+    <ScrollView contentContainerStyle={s.homeContent}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={BLUE} />}>
+      <Text style={s.brand}>SMART CLASSROOM</Text>
+      <Text style={s.pageTitle}>Lịch sử điểm danh</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <Pressable style={[s.filter, selected === null && s.filterActive]} onPress={() => setCourseId(null)}>
+          <Text style={{ color: selected === null ? 'white' : BLUE }}>Tất cả</Text>
+        </Pressable>
+        {courses.map(course => <Pressable key={course.id}
+          accessibilityLabel={`Lọc môn ${course.name}`}
+          style={[s.filter, selected === course.id && s.filterActive]} onPress={() => setCourseId(course.id)}>
+          <Text style={{ color: selected === course.id ? 'white' : BLUE }}>{course.code}</Text>
+        </Pressable>)}
+      </ScrollView>
+      {loading || error || !visible.length ? <DataMessage loading={loading} error={error}
+        empty="Chưa có lịch sử điểm danh." onRetry={refresh} /> : visible.map(item => {
+        const status = statusLabels[item.status] ?? { label: 'Chưa xác định', color: '#667085' };
+        return <View key={`${item.session_id}-${item.course_id}`} style={s.dataCard}>
+          <Text style={s.actionTitle}>{item.course_name}</Text>
+          <Text style={s.actionSubtitle}>{item.course_code} · Phiên #{item.session_id}</Text>
+          <Text style={s.actionSubtitle}>Buổi học: {dateLabel(item.start_time)}</Text>
+          {item.checked_in_at && <Text style={s.actionSubtitle}>Điểm danh: {dateLabel(item.checked_in_at)}</Text>}
+          <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
+        </View>;
+      })}
+    </ScrollView>
+  </SafeAreaView>;
 }
 
 function HomeScreen({
@@ -99,6 +201,7 @@ function HomeScreen({
   navigation: BottomTabScreenProps<Tabs, 'Home'>['navigation'];
 }) {
   const [loggingOut, setLoggingOut] = useState(false);
+  const courses = useStudentData<Course>('/courses', 'courses');
 
   const roleLabel =
     user.role === 'STUDENT'
@@ -127,7 +230,8 @@ function HomeScreen({
 
   return (
     <SafeAreaView style={s.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={s.homeContent}>
+      <ScrollView contentContainerStyle={s.homeContent}
+        refreshControl={<RefreshControl refreshing={courses.loading} onRefresh={courses.refresh} tintColor={BLUE} />}>
         <View style={s.rowBetween}>
           <View>
             <Text style={s.brand}>SMART CLASSROOM</Text>
@@ -160,6 +264,15 @@ function HomeScreen({
           </View>
         </View>
 
+        <Text style={s.sectionTitle}>Môn học của bạn</Text>
+        {courses.loading || courses.error || !courses.items.length
+          ? <DataMessage loading={courses.loading} error={courses.error}
+              empty="Bạn chưa đăng ký môn học nào." onRetry={courses.refresh} />
+          : courses.items.map(course => <View key={course.id} style={s.dataCard}>
+              <Text style={s.actionTitle}>{course.name}</Text>
+              <Text style={s.actionSubtitle}>Mã môn: {course.code}</Text>
+              <Text style={s.actionSubtitle}>Giảng viên: {course.lecturer_username || 'Chưa phân công'}</Text>
+            </View>)}
         <Text style={s.sectionTitle}>Điểm danh hôm nay</Text>
 
         <Pressable
@@ -270,6 +383,11 @@ export default function App() {
         typeof account?.role !== 'string'
       ) {
         Alert.alert('Lỗi dữ liệu', 'Thông tin máy chủ trả về chưa hợp lệ.');
+        return;
+      }
+
+      if (account.role !== 'STUDENT') {
+        Alert.alert('Tài khoản sinh viên', 'Vui lòng đăng nhập bằng tài khoản sinh viên.');
         return;
       }
 
@@ -457,6 +575,12 @@ export default function App() {
 }
 
 const s = StyleSheet.create({
+  dataCard: { backgroundColor: 'white', padding: 17, borderRadius: 18, gap: 6 },
+  errorText: { color: '#B91C1C', fontSize: 14, lineHeight: 21 },
+  retryText: { color: BLUE, fontWeight: '700', paddingVertical: 10 },
+  statusText: { fontSize: 13, fontWeight: '700', marginTop: 8 },
+  filter: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 20, backgroundColor: '#E8F0FF', marginRight: 8 },
+  filterActive: { backgroundColor: BLUE },
   flex: { flex: 1 },
   screen: { flex: 1, backgroundColor: '#F6F8FC' },
   pressed: { opacity: 0.7 },
