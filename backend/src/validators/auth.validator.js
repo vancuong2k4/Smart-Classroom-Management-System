@@ -7,7 +7,8 @@ const AppError = require('../utils/AppError');
 // Chỉ cho phép tự đăng ký với vai trò STUDENT hoặc LECTURER.
 // Tài khoản ADMIN KHÔNG được tạo qua API công khai (tránh leo thang đặc quyền).
 const SELF_REGISTER_ROLES = ['STUDENT', 'LECTURER'];
-const USERNAME_REGEX = /^[\p{L}\p{N}_. ]{3,50}$/u;
+
+const USERNAME_REGEX = /^[a-zA-Z0-9_.]{3,50}$/;
 const PASSWORD_MIN_LENGTH = 6;
 const PASSWORD_MAX_LENGTH = 72; // bcrypt chỉ xử lý tối đa 72 byte, phần dư bị bỏ qua
 
@@ -29,7 +30,7 @@ const validateRegister = (req, res, next) => {
     }
 
     req.body = {
-        username: username.trim(),
+        username: username.trim().toLowerCase(),
         password,
         role: normalizedRole,
     };
@@ -45,7 +46,7 @@ const validateLogin = (req, res, next) => {
     }
 
     req.body = {
-        username: username.trim(),
+        username: username.trim().toLowerCase(),
         password,
     };
     next();
