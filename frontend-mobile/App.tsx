@@ -1,3 +1,4 @@
+import QRScannerScreen from './QRScannerScreen';
 import { useCallback, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
@@ -71,13 +72,7 @@ function EmptyScreen({
 }
 
 function ScanScreen() {
-  return (
-    <EmptyScreen
-      icon="qr-code-outline"
-      title="Quét mã điểm danh"
-      description="Tính năng quét mã đang được chuẩn bị. Bạn sẽ có thể quét mã QR của giảng viên tại đây."
-    />
-  );
+  return <QRScannerScreen />;
 }
 
 type Course = {
