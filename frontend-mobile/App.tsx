@@ -1,3 +1,4 @@
+import { API_URL } from './apiConfig';
 import QRScannerScreen from './QRScannerScreen';
 import { useCallback, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
@@ -26,7 +27,7 @@ import {
   View,
 } from 'react-native';
 
-const API_URL = 'http://192.168.1.6:3000/api';
+
 const TOKEN_KEY = 'smartclass_token';
 const BLUE = '#1765EE';
 
