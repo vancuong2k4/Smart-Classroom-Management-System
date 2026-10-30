@@ -1,3 +1,6 @@
+import { usePreparedLocation } from './usePreparedLocation';
+import { API_URL } from './apiConfig';
+import { useAttendanceCheckin } from './useAttendanceCheckin';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, AppState, Linking, Pressable,
@@ -17,6 +20,10 @@ export default function QRScannerScreen() {
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const locked = useRef(false);
+  const { checkin, submitCheckin, resetCheckin } = useAttendanceCheckin(API_URL, focused);
+  const gps = usePreparedLocation(
+    focused && active && !!permission?.granted && !token && !error
+  );
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
@@ -39,6 +46,7 @@ export default function QRScannerScreen() {
   }, [focused, getPermission]);
 
   const reset = () => {
+    resetCheckin();
     locked.current = false;
     setToken('');
     setError('');
@@ -59,6 +67,53 @@ export default function QRScannerScreen() {
 
   if (!focused || !active) return <View style={s.screen} />;
 
+  if (permission?.granted && !token && !error && !gps.position) {
+    return (
+      <SafeAreaView style={s.screen} edges={['top']}>
+        <ScrollView contentContainerStyle={s.content}>
+          <View style={s.heading}>
+            <Text style={s.brand}>SMART CLASSROOM</Text>
+            <Text style={s.pageTitle}>Chuẩn bị điểm danh</Text>
+          </View>
+          <View style={s.center}>
+            <View style={s.card}>
+              <View style={s.iconCircle}>
+                {gps.busy ? <ActivityIndicator size="large" color={BLUE} /> : (
+                  <Ionicons name="location-outline" size={44} color={BLUE} />
+                )}
+              </View>
+              <Text style={s.title}>Xác nhận vị trí</Text>
+              <Text style={s.description}>{gps.message}</Text>
+              <Text style={s.note}>
+                Camera sẽ mở khi có GPS mới và đủ chính xác.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                disabled={gps.busy}
+                style={[s.button, gps.busy && { opacity: 0.6 }]}
+                onPress={() => {
+                  if (gps.settings) {
+                    Linking.openSettings().catch(() =>
+                      setError('Không mở được cài đặt. Vui lòng mở từ điện thoại.')
+                    );
+                  } else {
+                    void gps.prepare();
+                  }
+                }}
+              >
+                <Text style={s.buttonText}>
+                  {gps.busy ? 'Đang chuẩn bị…'
+                    : gps.settings ? 'Mở cài đặt vị trí' : 'Chuẩn bị GPS'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+
   const scanning = permission?.granted && !token && !error;
 
   if (scanning) {
@@ -76,9 +131,11 @@ export default function QRScannerScreen() {
               setError('Không thể khởi động camera. Vui lòng thử lại.')
             }
             onBarcodeScanned={({ data }) => {
-              if (locked.current || !data.trim()) return;
+              if (locked.current || !data.trim() || !gps.position) return;
+              if (Math.abs(Date.now() - gps.position.timestamp) > 10000) return;
               locked.current = true;
               setToken(data);
+              void submitCheckin(data, gps.position);
             }}
           />
         </View>
@@ -171,6 +228,93 @@ export default function QRScannerScreen() {
           </View>
         </View>
       </View>
+    );
+  }
+
+
+  if (permission?.granted && checkin.phase !== 'idle') {
+    const busy = checkin.phase === 'location' || checkin.phase === 'sending';
+    const success = checkin.phase === 'success';
+    const color = busy ? BLUE : success ? '#078447' : '#C24135';
+    const tint = busy ? '#EDF4FF' : success ? '#ECFDF3' : '#FFF1F0';
+    const resultTitle = busy
+      ? checkin.phase === 'location' ? 'Đang lấy vị trí' : 'Đang điểm danh'
+      : success ? 'Điểm danh thành công'
+      : checkin.uncertain ? 'Chưa xác nhận kết quả' : 'Chưa thể điểm danh';
+
+    return (
+      <SafeAreaView style={s.screen} edges={['top']}>
+        <ScrollView contentContainerStyle={s.content}>
+          <View style={s.heading}>
+            <Text style={s.brand}>SMART CLASSROOM</Text>
+            <Text style={s.pageTitle}>Điểm danh</Text>
+          </View>
+          <View style={s.center}>
+            <View style={s.card}>
+              <View style={[s.iconCircle, { backgroundColor: tint }]}>
+                {busy ? <ActivityIndicator size="large" color={color} /> : (
+                  <Ionicons
+                    name={success ? 'checkmark-circle-outline' : 'alert-circle-outline'}
+                    size={44}
+                    color={color}
+                  />
+                )}
+              </View>
+              <Text style={[s.title, { color }]}>{resultTitle}</Text>
+              {success && (
+                <Text style={{
+                  color, backgroundColor: tint, overflow: 'hidden',
+                  paddingHorizontal: 18, paddingVertical: 8,
+                  borderRadius: 14, fontWeight: '700', marginTop: 16,
+                }}>
+                  {checkin.status === 'LATE' ? 'Đi muộn' : 'Có mặt'}
+                </Text>
+              )}
+              <Text style={s.description}>{checkin.message}</Text>
+              {busy && (
+                <Text style={s.note}>
+                  Giữ ứng dụng mở trong khi xử lý.
+                </Text>
+              )}
+              {!busy && checkin.settings && (
+                <Pressable
+                  accessibilityRole="button"
+                  style={s.button}
+                  onPress={() => {
+                    Linking.openSettings().catch(() =>
+                      setError('Không mở được cài đặt. Hãy mở Cài đặt trên điện thoại.')
+                    );
+                  }}
+                >
+                  <Text style={s.buttonText}>Mở cài đặt vị trí</Text>
+                </Pressable>
+              )}
+              {!busy && (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={reset}
+                  style={({ pressed }) => [
+                    s.button, pressed && s.buttonPressed,
+                  ]}
+                >
+                  <Ionicons name="scan-outline" size={21} color="white" />
+                  <Text style={s.buttonText}>Quét mã mới</Text>
+                </Pressable>
+              )}
+              {!!error && <Text style={s.errorText}>{error}</Text>}
+              {checkin.uncertain && (
+                <Text style={s.note}>
+                  Chọn tab Lịch sử bên dưới để kiểm tra kết quả.
+                </Text>
+              )}
+            </View>
+          </View>
+          <View style={s.footer}>
+            <Ionicons name="shield-checkmark-outline" size={17} color="#94A3B8" />
+            <Text style={s.footerText}>Hệ thống điểm danh thông minh</Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
