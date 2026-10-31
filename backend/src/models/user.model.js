@@ -58,10 +58,36 @@ const create = async ({ username, passwordHash, role }) => {
     return rows[0];
 };
 
+/**
+ * Lấy danh sách users (có hỗ trợ lọc theo role và tìm kiếm theo username).
+ */
+const findAll = async ({ role, search } = {}) => {
+    const conditions = [];
+    const values = [];
+
+    if (role) {
+        values.push(role);
+        conditions.push(`role = $${values.length}`);
+    }
+
+    if (search) {
+        values.push(`%${search.trim().toLowerCase()}%`);
+        conditions.push(`LOWER(username) LIKE $${values.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const { rows } = await pool.query(
+        `SELECT ${PUBLIC_COLUMNS} FROM users ${whereClause} ORDER BY role ASC, username ASC`,
+        values
+    );
+    return rows;
+};
+
 module.exports = {
     findByUsernameWithPassword,
     findByUsername,
     findById,
     findByUsernames,
     create,
+    findAll,
 };
