@@ -4,9 +4,22 @@ import { BookOpen, QrCode, BarChart3, LogOut, GraduationCap, ShieldCheck } from 
 function Layout({ onLogout }) {
   const navigate = useNavigate();
 
-  // Đọc thông tin Giảng viên đăng nhập từ LocalStorage
-  const userString = localStorage.getItem('user');
-  const user = userString ? JSON.parse(userString) : { fullName: 'Giảng viên', code: 'GV-2026', role: 'Giảng viên' };
+  // 1. Đọc thông tin user từ localStorage.getItem('user')
+  let user = null;
+  try {
+    const userString = localStorage.getItem('user');
+    user = userString ? JSON.parse(userString) : null;
+  } catch (error) {
+    console.error('Lỗi khi đọc thông tin user từ localStorage:', error);
+  }
+
+  // Xử lý vai trò (Role):
+  // - Nếu user.role === 'ADMIN': avatar là chữ "AD" và nhãn role là "Quản trị viên"
+  // - Nếu user.role === 'LECTURER': avatar là chữ "GV" và nhãn role là "Giảng viên"
+  const isAdmin = user?.role === 'ADMIN';
+  const isLecturer = user?.role === 'LECTURER';
+  const avatarText = isAdmin ? 'AD' : 'GV';
+  const roleLabel = isAdmin ? 'Quản trị viên' : 'Giảng viên';
 
   const handleLogout = () => {
     if (window.confirm('Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?')) {
@@ -88,29 +101,32 @@ function Layout({ onLogout }) {
               </div>
             </NavLink>
 
-            <NavLink
-              to="/qr-projector"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 14px',
-                borderRadius: '12px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#ffffff',
-                textDecoration: 'none',
-                backgroundColor: isActive ? '#0040a8' : 'transparent',
-                boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                transition: 'all 0.2s ease'
-              })}
-            >
-              <QrCode size={20} />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span>Máy chiếu QR</span>
-                <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Điểm danh thời gian thực</span>
-              </div>
-            </NavLink>
+            {/* 2. Thanh Sidebar: Ẩn hoàn toàn mục "Máy chiếu QR" nếu tài khoản là ADMIN (chỉ hiển thị khi user.role === 'LECTURER') */}
+            {user?.role === 'LECTURER' && (
+              <NavLink
+                to="/qr-projector"
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  textDecoration: 'none',
+                  backgroundColor: isActive ? '#0040a8' : 'transparent',
+                  boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                  transition: 'all 0.2s ease'
+                })}
+              >
+                <QrCode size={20} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Máy chiếu QR</span>
+                  <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Điểm danh thời gian thực</span>
+                </div>
+              </NavLink>
+            )}
 
             <NavLink
               to="/statistics"
@@ -172,17 +188,21 @@ function Layout({ onLogout }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Khung Thông Tin Giảng Viên */}
+            {/* Khung Thông Tin Người Dùng */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#f5f7fb', padding: '6px 12px', borderRadius: '20px', border: '1px solid #e1e4e8' }}>
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e5efff', color: '#0068ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '12px' }}>
-                GV
+                {avatarText}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: '#081c36', lineHeight: 1.2 }}>{user.fullName || 'Giảng viên'}</span>
-                <span style={{ fontSize: '10px', color: '#0068ff', fontWeight: '500' }}>Mã: {user.code || 'GV-2026'}</span>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: '#081c36', lineHeight: 1.2 }}>
+                  {user?.fullName || user?.username || roleLabel}
+                </span>
+                <span style={{ fontSize: '10px', color: '#0068ff', fontWeight: '500' }}>
+                  Mã: {user?.code || user?.username || (isAdmin ? 'AD-2026' : 'GV-2026')}
+                </span>
               </div>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', backgroundColor: '#e5efff', color: '#0068ff', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '600', marginLeft: '4px' }}>
-                <ShieldCheck size={12} /> {user.role || 'Giảng viên'}
+                <ShieldCheck size={12} /> {roleLabel}
               </span>
             </div>
 
