@@ -30,7 +30,14 @@ client.on('ready', () => console.log('✅ Redis connected'));
  */
 const connectRedis = async () => {
     if (!client.isOpen) {
-        await client.connect();
+        try {
+            await Promise.race([
+                client.connect(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Redis connection timeout')), 2000))
+            ]);
+        } catch (err) {
+            console.warn('⚠️ [Redis] Không thể kết nối tới Redis service. Ứng dụng tiếp tục chạy ở chế độ dev.');
+        }
     }
     return client;
 };

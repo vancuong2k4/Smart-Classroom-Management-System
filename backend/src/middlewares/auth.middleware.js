@@ -13,9 +13,14 @@ const AppError = require('../utils/AppError');
  * Nếu hợp lệ, gán thông tin user vào req.user = { id, role }.
  */
 const authenticate = (req, res, next) => {
+    let token = null;
     const authHeader = req.headers.authorization || '';
-    const [scheme, bearerToken] = authHeader.split(' ');
-    const token = (scheme === 'Bearer' && bearerToken) ? bearerToken : req.query.token;
+    const [scheme, headerToken] = authHeader.split(' ');
+    if (scheme === 'Bearer' && headerToken) {
+        token = headerToken;
+    } else if (req.query && req.query.token) {
+        token = req.query.token;
+    }
 
     if (!token) {
         throw new AppError('Authentication token is missing', 401);

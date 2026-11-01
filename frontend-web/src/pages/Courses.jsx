@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   Search, 
@@ -23,7 +23,8 @@ function Courses() {
   } catch (error) {
     console.error('Lỗi khi đọc currentUser từ localStorage:', error);
   }
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const role = (currentUser?.role || '').toUpperCase();
+  const isAdmin = role === 'ADMIN';
 
   // Trạng thái lưu từ khóa tìm kiếm môn học
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,7 +63,7 @@ function Courses() {
   // 3. Lấy danh sách giảng viên (Nếu là Admin): GET /api/users?role=LECTURER
   const [lecturers, setLecturers] = useState([]);
 
-  const fetchLecturers = async () => {
+  const fetchLecturers = useCallback(async () => {
     if (!isAdmin) return;
     try {
       const res = await axiosClient.get('/users?role=LECTURER');
@@ -72,47 +73,57 @@ function Courses() {
       console.error('Lỗi khi tải danh sách giảng viên:', err);
       setLecturers([]);
     }
-  };
+  }, [isAdmin]);
 
   useEffect(() => {
     if (isAdmin) {
-      fetchLecturers();
+      const loadLecturers = async () => {
+        await fetchLecturers();
+      };
+      loadLecturers();
     }
-  }, [isAdmin]);
+  }, [isAdmin, fetchLecturers]);
 
   // Tải danh sách lớp học thật từ Backend khi component mount
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const response = await axiosClient.get('/courses');
-      const courseList = response.data?.courses || response?.courses || (Array.isArray(response) ? response : []);
-      setCourses(courseList);
-      if (courseList.length > 0) {
+      const courseList = response.data?.courses || response?.courses || response.data || (Array.isArray(response) ? response : []);
+      const validCourses = Array.isArray(courseList) ? courseList : [];
+      setCourses(validCourses);
+      if (validCourses.length > 0) {
         setSelectedCourse((prev) => {
-          if (!prev) return courseList[0];
-          const matched = courseList.find((c) => c.id === prev.id);
-          return matched || courseList[0];
+          if (!prev) return validCourses[0];
+          const matched = validCourses.find((c) => c.id === prev.id);
+          return matched || validCourses[0];
         });
       } else {
         setSelectedCourse(null);
       }
     } catch (err) {
       console.error('Lỗi khi tải danh sách lớp học:', err);
-      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể tải danh sách khóa học.';
+      const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Không thể tải danh sách khóa học.';
       setError(errMsg);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchCourses();
   }, []);
 
+  useEffect(() => {
+    const loadCourses = async () => {
+      await fetchCourses();
+    };
+    loadCourses();
+  }, [fetchCourses]);
+
   // Tải danh sách sinh viên khi chọn lớp học phần
-  const fetchStudents = async (courseId) => {
-    if (!courseId) return;
+  const fetchStudents = useCallback(async (courseId) => {
+    if (!courseId) {
+      setStudents([]);
+      return;
+    }
     setLoadingStudents(true);
     try {
       const response = await axiosClient.get(`/courses/${courseId}/students`);
@@ -124,42 +135,49 @@ function Courses() {
     } finally {
       setLoadingStudents(false);
     }
-  };
+  }, []);
+
+  const selectedCourseId = selectedCourse?.id;
 
   useEffect(() => {
-    if (selectedCourse?.id) {
-      fetchStudents(selectedCourse.id);
-    } else {
-      setStudents([]);
-    }
-  }, [selectedCourse?.id]);
+    const loadStudents = async () => {
+      await fetchStudents(selectedCourseId);
+    };
+    loadStudents();
+  }, [selectedCourseId, fetchStudents]);
 
   // 4. Modal "Thêm khóa học":
-  // - Nếu là ADMIN: submit body { code, name, lecturerId } (nếu không chọn gửi null)
-  // - Nếu là LECTURER: giữ nguyên body { code, name }
+  // - Chuẩn hóa payload: code (trim()), name (trim())
+  // - Nếu là ADMIN và có chọn giảng viên: gửi thêm lecturerId: Number(newCourseLecturerId)
+  // - Nếu là LECTURER (hoặc Admin không chọn GV): chỉ gửi { code, name }
   const handleCreateCourse = async (e) => {
     e.preventDefault();
-    if (!newCourseName.trim() || !newCourseCode.trim()) return;
+    const code = newCourseCode.trim();
+    const name = newCourseName.trim();
+
+    if (!code || !name) {
+      const msg = 'Vui lòng nhập đầy đủ mã lớp và tên môn học!';
+      setCreateCourseError(msg);
+      alert(msg);
+      return;
+    }
 
     setSubmittingCourse(true);
     setCreateCourseError('');
 
-    const code = newCourseCode.toUpperCase().trim();
-    const name = newCourseName.trim();
+    const payload = {
+      code,
+      name,
+    };
 
-    const body = isAdmin
-      ? {
-          code,
-          name,
-          lecturerId: newCourseLecturerId ? Number(newCourseLecturerId) : null,
-        }
-      : {
-          code,
-          name,
-        };
+    if (isAdmin && newCourseLecturerId) {
+      const lecturerId = Number(newCourseLecturerId);
+      payload.lecturerId = lecturerId;
+      payload.lecturer_id = lecturerId;
+    }
 
     try {
-      const response = await axiosClient.post('/courses', body);
+      const response = await axiosClient.post('/courses', payload);
       const createdCourse = response.data?.course || response?.course || response.data || response;
 
       setNewCourseName('');
@@ -175,16 +193,16 @@ function Courses() {
       const errMsg =
         err.response?.data?.message ||
         err.response?.data?.error ||
+        err.message ||
         'Không thể tạo lớp học mới. Vui lòng kiểm tra lại thông tin!';
       setCreateCourseError(errMsg);
+      alert(`Lỗi tạo lớp học: ${errMsg}`);
     } finally {
       setSubmittingCourse(false);
     }
   };
 
-  // 5. Nút "Phân công lại" (Reassign Lecturer):
-  // Chỉ hiển thị cho ADMIN. Mở modal chọn Giảng viên mới -> gọi API PATCH /api/courses/:id
-  // với body { lecturerId: selectedId ? Number(selectedId) : null }
+  // 5. Nút "Phân công lại" (Reassign Lecturer - ADMIN)
   const handleOpenReassignModal = (course) => {
     setReassignCourse(course);
     setReassignLecturerId(course.lecturer_id || course.lecturerId || '');
@@ -201,6 +219,7 @@ function Courses() {
     const selectedId = reassignLecturerId ? Number(reassignLecturerId) : null;
     const body = {
       lecturerId: selectedId ? Number(selectedId) : null,
+      lecturer_id: selectedId ? Number(selectedId) : null,
     };
 
     try {
@@ -212,15 +231,16 @@ function Courses() {
       const errMsg =
         err.response?.data?.message ||
         err.response?.data?.error ||
+        err.message ||
         'Không thể phân công lại giảng viên!';
       setReassignError(errMsg);
+      alert(`Lỗi phân công lại: ${errMsg}`);
     } finally {
       setSubmittingReassign(false);
     }
   };
 
-  // 6. Nút "Xóa lớp học" (Delete Course):
-  // Chỉ hiển thị cho ADMIN. Khi bấm và xác nhận (confirm), gọi API DELETE /api/courses/:id
+  // 6. Nút "Xóa lớp học" (Delete Course - ADMIN)
   const handleDeleteCourse = async (courseId, courseName) => {
     if (!isAdmin) return;
     if (window.confirm(`Bạn có chắc chắn muốn xóa lớp học "${courseName || courseId}"?`)) {
@@ -233,7 +253,11 @@ function Courses() {
         await fetchCourses();
       } catch (err) {
         console.error('Lỗi khi xóa lớp học:', err);
-        const errMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể xóa lớp học phần này!';
+        const errMsg =
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          'Không thể xóa lớp học phần này!';
         alert(errMsg);
       }
     }
@@ -254,7 +278,7 @@ function Courses() {
       fetchCourses();
     } catch (err) {
       console.error('Lỗi khi thêm sinh viên:', err);
-      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể thêm sinh viên vào lớp học!';
+      const errMsg = err.response?.data?.message || err.message || 'Không thể thêm sinh viên vào lớp học!';
       alert(errMsg);
     }
   };
@@ -269,7 +293,7 @@ function Courses() {
         fetchCourses();
       } catch (err) {
         console.error('Lỗi khi xóa sinh viên:', err);
-        const errMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể xóa sinh viên khỏi lớp!';
+        const errMsg = err.response?.data?.message || err.message || 'Không thể xóa sinh viên khỏi lớp!';
         alert(errMsg);
       }
     }

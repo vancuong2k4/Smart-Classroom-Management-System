@@ -4,20 +4,18 @@ import { BookOpen, QrCode, BarChart3, LogOut, GraduationCap, ShieldCheck } from 
 function Layout({ onLogout }) {
   const navigate = useNavigate();
 
-  // 1. Đọc thông tin user từ localStorage.getItem('user')
+  // Đọc an toàn thông tin người dùng từ localStorage.getItem('user')
   let user = null;
   try {
-    const userString = localStorage.getItem('user');
-    user = userString ? JSON.parse(userString) : null;
+    const storedUser = localStorage.getItem('user');
+    user = storedUser ? JSON.parse(storedUser) : null;
   } catch (error) {
     console.error('Lỗi khi đọc thông tin user từ localStorage:', error);
   }
 
-  // Xử lý vai trò (Role):
-  // - Nếu user.role === 'ADMIN': avatar là chữ "AD" và nhãn role là "Quản trị viên"
-  // - Nếu user.role === 'LECTURER': avatar là chữ "GV" và nhãn role là "Giảng viên"
+  // Nếu user?.role === 'ADMIN': hiển thị Avatar "AD" và nhãn "Quản trị viên"
+  // Ngược lại (hoặc là Giảng viên): hiển thị Avatar "GV" và nhãn "Giảng viên"
   const isAdmin = user?.role === 'ADMIN';
-  const isLecturer = user?.role === 'LECTURER';
   const avatarText = isAdmin ? 'AD' : 'GV';
   const roleLabel = isAdmin ? 'Quản trị viên' : 'Giảng viên';
 
@@ -77,6 +75,7 @@ function Layout({ onLogout }) {
               Chức năng chính
             </span>
 
+            {/* Menu "Quản lý khóa học" */}
             <NavLink
               to="/courses"
               style={({ isActive }) => ({
@@ -101,33 +100,32 @@ function Layout({ onLogout }) {
               </div>
             </NavLink>
 
-            {/* 2. Thanh Sidebar: Ẩn hoàn toàn mục "Máy chiếu QR" nếu tài khoản là ADMIN (chỉ hiển thị khi user.role === 'LECTURER') */}
-            {user?.role === 'LECTURER' && (
-              <NavLink
-                to="/qr-projector"
-                style={({ isActive }) => ({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 14px',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#ffffff',
-                  textDecoration: 'none',
-                  backgroundColor: isActive ? '#0040a8' : 'transparent',
-                  boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                  transition: 'all 0.2s ease'
-                })}
-              >
-                <QrCode size={20} />
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span>Máy chiếu QR</span>
-                  <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Điểm danh thời gian thực</span>
-                </div>
-              </NavLink>
-            )}
+            {/* Menu "Máy chiếu QR": Hiển thị cố định trên Sidebar để mở màn hình chiếu điểm danh */}
+            <NavLink
+              to="/qr-projector"
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 14px',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#ffffff',
+                textDecoration: 'none',
+                backgroundColor: isActive ? '#0040a8' : 'transparent',
+                boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                transition: 'all 0.2s ease'
+              })}
+            >
+              <QrCode size={20} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span>Máy chiếu QR</span>
+                <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Điểm danh thời gian thực</span>
+              </div>
+            </NavLink>
 
+            {/* Menu "Thống kê" */}
             <NavLink
               to="/statistics"
               style={({ isActive }) => ({

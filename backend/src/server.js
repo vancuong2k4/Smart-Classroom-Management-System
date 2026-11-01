@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const http = require('http');
 const app = require('./app');
 const { Server } = require('socket.io');
@@ -16,6 +17,8 @@ const io = new Server(server, {
         methods: ['GET', 'POST']
     }
 });
+
+app.set('io', io);
 
 // Setup Websocket logic
 setupSocket(io);

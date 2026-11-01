@@ -23,7 +23,7 @@ Mỗi Task sau khi hoàn thành sẽ có 1 file `README_TXXX.md` trong thư mụ
 | T015 | Camera & Trình quét mã QR | Mobile | ✅ Hoàn thành | [README_T015.md](./README_T015.md) |
 | T016 | GPS & API điểm danh | Mobile | ✅ Hoàn thành | [README_T016.md](./README_T016.md) |
 | T017 | Kiểm thử tích hợp Web và ứng dụng điểm danh | Tích hợp / QA | ✅ Hoàn thành | [README_T017.md](./README_T017.md) |
-| T018 | Quản lý Tài khoản & Hoàn thiện Phân quyền Khóa học (Users & RBAC) | Backend | ✅ Hoàn thành | [README_T018.md](./README_T018.md) |
+| T018 | Quản lý Tài khoản & Hoàn thiện Phân quyền Khóa học (Users & RBAC) | Frontend Web / Backend | ✅ Hoàn thành | [README_T018.md](./README_T018.md) |
 
 ## Cấu trúc chuẩn của một file README_TXXX.md
 1. **Bảng thông tin** — Task ID, Stream, Epic, Người phụ trách, Trạng thái, Definition of Done
