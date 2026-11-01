@@ -17,7 +17,7 @@ const exportCourseReportCsv = async (user, courseId) => {
     
     // Header
     csvContent += `Báo cáo điểm danh lớp:,${course.code} - ${course.name}\n`;
-    csvContent += `Giảng viên:,${user.username}\n`;
+    csvContent += `Giảng viên:,${course.lecturer_username || user.username}\n`;
     csvContent += `Ngày xuất báo cáo:,${new Date().toISOString()}\n\n`;
     
     // Bảng dữ liệu

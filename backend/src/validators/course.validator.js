@@ -35,37 +35,42 @@ const parseLecturerId = (lecturerId) => {
 };
 
 const validateCreateCourse = (req, res, next) => {
-    const { code, name, lecturer_id: lecturerId } = req.body || {};
+    const rawLecturerId = req.body?.lecturer_id !== undefined ? req.body.lecturer_id : req.body?.lecturerId;
+    const { code, name } = req.body || {};
 
     req.body = {
         code: parseCode(code),
         name: parseName(name),
-        lecturerId: lecturerId === undefined ? undefined : parseLecturerId(lecturerId),
+        lecturerId: rawLecturerId === undefined ? undefined : parseLecturerId(rawLecturerId),
     };
     next();
 };
 
 const validateUpdateCourse = (req, res, next) => {
-    const { code, name, lecturer_id: lecturerId } = req.body || {};
+    const rawLecturerId = req.body?.lecturer_id !== undefined ? req.body.lecturer_id : req.body?.lecturerId;
+    const { code, name } = req.body || {};
 
-    if (code === undefined && name === undefined && lecturerId === undefined) {
+    if (code === undefined && name === undefined && rawLecturerId === undefined) {
         throw new AppError('At least one of code, name, lecturer_id is required', 400);
     }
 
     req.body = {
         code: code === undefined ? undefined : parseCode(code),
         name: name === undefined ? undefined : parseName(name),
-        lecturerId: lecturerId === undefined ? undefined : parseLecturerId(lecturerId),
+        lecturerId: rawLecturerId === undefined ? undefined : parseLecturerId(rawLecturerId),
     };
     next();
 };
 
 /**
- * Body: { "usernames": ["sv001", "sv002", ...] }
+ * Body: { "usernames": ["sv001", "sv002", ...] } hoặc { "username": "sv001" }
  * Username được chuẩn hóa (trim + lowercase) giống lúc đăng ký ở T003.
  */
 const validateAddStudents = (req, res, next) => {
-    const { usernames } = req.body || {};
+    let usernames = req.body?.usernames;
+    if (usernames === undefined && typeof req.body?.username === 'string') {
+        usernames = [req.body.username];
+    }
 
     if (!Array.isArray(usernames) || usernames.length === 0
         || usernames.length > MAX_USERNAMES_PER_REQUEST) {

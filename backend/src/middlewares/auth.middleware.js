@@ -9,14 +9,15 @@ const authService = require('../services/auth.service');
 const AppError = require('../utils/AppError');
 
 /**
- * Xác thực JWT từ header: "Authorization: Bearer <token>".
+ * Xác thực JWT từ header: "Authorization: Bearer <token>" hoặc query param "?token=<token>" (dùng cho download file).
  * Nếu hợp lệ, gán thông tin user vào req.user = { id, role }.
  */
 const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization || '';
-    const [scheme, token] = authHeader.split(' ');
+    const [scheme, bearerToken] = authHeader.split(' ');
+    const token = (scheme === 'Bearer' && bearerToken) ? bearerToken : req.query.token;
 
-    if (scheme !== 'Bearer' || !token) {
+    if (!token) {
         throw new AppError('Authentication token is missing', 401);
     }
 

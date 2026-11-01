@@ -17,6 +17,11 @@ function QRProjector() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const [classLatitude, setClassLatitude] = useState('');
+  const [classLongitude, setClassLongitude] = useState('');
+  const [allowedNetwork, setAllowedNetwork] = useState('');
+  const [radiusMeters, setRadiusMeters] = useState('50');
+
   const socketRef = useRef(null);
 
   // 1. Tải danh sách lớp học thật của giảng viên từ Database khi mở trang
@@ -76,14 +81,31 @@ function QRProjector() {
     setScannedStudents([]);
 
     try {
+      const latitude = Number(classLatitude);
+      const longitude = Number(classLongitude);
+      const radius = Number(radiusMeters);
+      if (!classLatitude.trim() || !classLongitude.trim() ||
+          !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+          !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        throw new Error('Vui lòng nhập tọa độ lớp hợp lệ.');
+      }
+      if (!Number.isFinite(radius) || radius < 10 || radius > 1000) {
+        throw new Error('Bán kính phải từ 10 đến 1000 mét.');
+      }
+      if (!allowedNetwork.trim()) {
+        throw new Error('Vui lòng nhập mạng IP được phép của lớp.');
+      }
+      if (/\/0$/.test(allowedNetwork.trim())) {
+        throw new Error('Vui lòng nhập mạng cụ thể, không dùng dải cho phép mọi IP.');
+      }
       // 2. Gọi API POST /api/courses/${courseId}/sessions kèm durationMinutes
       const response = await axiosClient.post(`/courses/${selectedClass}/sessions`, {
         durationMinutes: selectedDuration,
         duration_minutes: selectedDuration,
-        latitude: 10.762622,
-        longitude: 106.660172,
-        ip_range: '0.0.0.0/0',
-        radius_meters: 100,
+        latitude,
+        longitude,
+        ip_range: allowedNetwork.trim(),
+        radius_meters: radius,
       });
 
       const session = response.data?.session || response?.session || response.data || response;
@@ -234,6 +256,31 @@ function QRProjector() {
                 )}
               </select>
             </div>
+
+            <fieldset disabled={isSessionActive || loading}
+              style={{ border: '1px solid #e1e4e8', borderRadius: '12px', padding: '14px', margin: 0 }}>
+              <legend style={{ color: '#081c36', fontWeight: 600, fontSize: '13px' }}>
+                Vị trí và phạm vi lớp học
+              </legend>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                {[
+                  ['Vĩ độ', classLatitude, setClassLatitude, 'Ví dụ: 10.123456'],
+                  ['Kinh độ', classLongitude, setClassLongitude, 'Ví dụ: 106.123456'],
+                  ['Mạng IP được phép (CIDR)', allowedNetwork, setAllowedNetwork, 'Ví dụ: 192.168.1.0/24'],
+                  ['Bán kính (mét)', radiusMeters, setRadiusMeters, '50'],
+                ].map(([label, value, setter, placeholder]) => (
+                  <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#081c36' }}>
+                    {label}
+                    <input value={value} onChange={(event) => setter(event.target.value)}
+                      placeholder={placeholder}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: '8px', border: '1px solid #e1e4e8', background: '#f5f7fb' }} />
+                  </label>
+                ))}
+              </div>
+              <p style={{ fontSize: '12px', color: '#7589a3', marginBottom: 0 }}>
+                Nhập tọa độ tại lớp và dải mạng do quản trị viên cung cấp.
+              </p>
+            </fieldset>
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#081c36', marginBottom: '8px' }}>

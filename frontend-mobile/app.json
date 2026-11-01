@@ -22,7 +22,23 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cho phép Smart Classroom dùng camera để quét mã điểm danh.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Cho phép Smart Classroom sử dụng vị trí khi điểm danh để xác nhận bạn đang ở trong lớp."
+        }
+      ]
     ]
   }
 }
