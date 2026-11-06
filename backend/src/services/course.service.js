@@ -51,7 +51,7 @@ const getManageableCourse = async (user, courseId) => {
     throw new AppError('You do not have permission to manage this course', 403);
 };
 
-const createCourse = async (user, { code, name, lecturerId }) => {
+const createCourse = async (user, { code, name, lecturerId, totalSessions, maxAbsences }) => {
     let assignedLecturerId = lecturerId ?? null;
 
     if (user.role === ROLES.LECTURER) {
@@ -66,7 +66,13 @@ const createCourse = async (user, { code, name, lecturerId }) => {
 
     let courseId;
     try {
-        courseId = await courseModel.create({ code, name, lecturerId: assignedLecturerId });
+        courseId = await courseModel.create({
+            code,
+            name,
+            lecturerId: assignedLecturerId,
+            totalSessions: totalSessions !== undefined ? totalSessions : 10,
+            maxAbsences: maxAbsences !== undefined ? maxAbsences : 2,
+        });
     } catch (err) {
         handleDuplicateCode(err);
     }
@@ -103,7 +109,7 @@ const getCourse = async (user, courseId) => {
     return course;
 };
 
-const updateCourse = async (user, courseId, { code, name, lecturerId }) => {
+const updateCourse = async (user, courseId, { code, name, lecturerId, totalSessions, maxAbsences }) => {
     await getManageableCourse(user, courseId);
 
     if (lecturerId !== undefined) {
@@ -117,7 +123,7 @@ const updateCourse = async (user, courseId, { code, name, lecturerId }) => {
     }
 
     try {
-        await courseModel.update(courseId, { code, name, lecturerId });
+        await courseModel.update(courseId, { code, name, lecturerId, totalSessions, maxAbsences });
     } catch (err) {
         handleDuplicateCode(err);
     }

@@ -2,7 +2,8 @@ const pool = require('../config/database');
 
 /**
  * Lấy thống kê điểm danh của toàn bộ sinh viên trong một lớp.
- * Sử dụng LEFT JOIN để liệt kê cả những sinh viên chưa từng điểm danh.
+ * Bao gồm: Có mặt, Đi muộn, Nghỉ có phép (EXCUSED), Gian lận/Lỗi vị trí, Vắng không phép,
+ * và Cảnh báo cấm thi (is_banned khi vắng > max_absences).
  */
 const getCourseReport = async (courseId) => {
     const query = `
@@ -17,6 +18,7 @@ const getCourseReport = async (courseId) => {
                 a.student_id,
                 COUNT(*) FILTER (WHERE a.status = 'PRESENT') AS present_count,
                 COUNT(*) FILTER (WHERE a.status = 'LATE') AS late_count,
+                COUNT(*) FILTER (WHERE a.status = 'EXCUSED') AS excused_count,
                 COUNT(*) FILTER (WHERE a.status = 'INVALID_LOCATION') AS invalid_count
             FROM attendance_records a
             WHERE a.session_id IN (SELECT id FROM course_sessions)
@@ -25,17 +27,32 @@ const getCourseReport = async (courseId) => {
         SELECT
             u.id AS student_id,
             u.username,
+            u.full_name,
+            u.email,
             COALESCE(sa.present_count, 0)::int AS present_count,
             COALESCE(sa.late_count, 0)::int AS late_count,
+            COALESCE(sa.excused_count, 0)::int AS excused_count,
             COALESCE(sa.invalid_count, 0)::int AS invalid_count,
-            COALESCE((SELECT total_sessions FROM session_count), 0)::int AS total_sessions,
-            (
+            COALESCE((SELECT total_sessions FROM session_count), 0)::int AS held_sessions,
+            c.total_sessions::int AS total_sessions,
+            c.max_absences::int AS max_absences,
+            GREATEST(0, (
                 COALESCE((SELECT total_sessions FROM session_count), 0) 
                 - COALESCE(sa.present_count, 0) 
                 - COALESCE(sa.late_count, 0)
-            )::int AS absent_count
+                - COALESCE(sa.excused_count, 0)
+            ))::int AS absent_count,
+            (
+                GREATEST(0, (
+                    COALESCE((SELECT total_sessions FROM session_count), 0) 
+                    - COALESCE(sa.present_count, 0) 
+                    - COALESCE(sa.late_count, 0)
+                    - COALESCE(sa.excused_count, 0)
+                )) > c.max_absences
+            ) AS is_banned
         FROM enrollments e
         JOIN users u ON u.id = e.student_id
+        JOIN courses c ON c.id = e.course_id
         LEFT JOIN student_attendance sa ON sa.student_id = u.id
         WHERE e.course_id = $1
         ORDER BY u.username;
@@ -62,6 +79,8 @@ const getStudentHistory = async (studentId, courseId = null) => {
             c.id AS course_id,
             c.code AS course_code,
             c.name AS course_name,
+            c.total_sessions::int AS total_sessions,
+            c.max_absences::int AS max_absences,
             s.id AS session_id,
             s.start_time,
             COALESCE(a.status, 'ABSENT') AS status,

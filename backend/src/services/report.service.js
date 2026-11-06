@@ -18,13 +18,16 @@ const exportCourseReportCsv = async (user, courseId) => {
     // Header
     csvContent += `Báo cáo điểm danh lớp:,${course.code} - ${course.name}\n`;
     csvContent += `Giảng viên:,${course.lecturer_username || user.username}\n`;
+    csvContent += `Tổng số buổi học phần:,${course.total_sessions || 10}\n`;
+    csvContent += `Số buổi vắng tối đa cho phép:,${course.max_absences !== undefined ? course.max_absences : 2}\n`;
     csvContent += `Ngày xuất báo cáo:,${new Date().toISOString()}\n\n`;
     
     // Bảng dữ liệu
-    csvContent += 'MSSV/Username,Có mặt,Đi muộn,Vắng mặt,Cố tình gian lận (Lỗi vị trí),Tổng số buổi\n';
+    csvContent += 'MSSV/Username,Họ và tên,Email,Có mặt,Đi muộn,Nghỉ có phép,Vắng không phép,Lỗi vị trí/Gian lận,Số buổi đã diễn ra,Trạng thái cấm thi\n';
 
     reportData.forEach(row => {
-        csvContent += `${row.username},${row.present_count},${row.late_count},${row.absent_count},${row.invalid_count},${row.total_sessions}\n`;
+        const bannedText = row.is_banned ? 'CẤM THI' : 'ĐỦ ĐIỀU KIỆN';
+        csvContent += `"${row.username}","${row.full_name || ''}","${row.email || ''}",${row.present_count},${row.late_count},${row.excused_count},${row.absent_count},${row.invalid_count},${row.held_sessions},"${bannedText}"\n`;
     });
 
     return csvContent;

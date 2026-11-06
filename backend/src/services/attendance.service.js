@@ -1,10 +1,33 @@
 const attendanceModel = require('../models/attendance.model');
 const enrollmentModel = require('../models/enrollment.model');
+const userModel = require('../models/user.model');
 const qrService = require('./qr.service');
 const AppError = require('../utils/AppError');
 const ROLES = require('../constants/roles');
 
-const checkin = async (user, { token, latitude, longitude, ipAddress }) => {
+const checkin = async (user, { token, latitude, longitude, ipAddress, deviceId }) => {
+    // 0. Kiểm tra tài khoản & Khóa thiết bị (Device Binding chống điểm danh hộ)
+    const dbUser = await userModel.findById(user.id);
+    if (!dbUser) {
+        throw new AppError('User not found', 404);
+    }
+    if (dbUser.is_locked) {
+        throw new AppError('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin!', 403);
+    }
+
+    if (!deviceId || typeof deviceId !== 'string' || deviceId.trim() === '') {
+        throw new AppError('Mã định danh thiết bị (deviceId) là bắt buộc khi điểm danh', 400);
+    }
+    const cleanDeviceId = deviceId.trim();
+
+    if (!dbUser.device_id) {
+        // Lần đầu điểm danh trên thiết bị: Tự động liên kết thiết bị
+        await userModel.update(user.id, { deviceId: cleanDeviceId });
+    } else if (dbUser.device_id !== cleanDeviceId) {
+        // Thiết bị không khớp với thiết bị đã đăng ký
+        throw new AppError('Tài khoản này đã được liên kết với một thiết bị khác. Vui lòng liên hệ Admin để đổi thiết bị!', 403);
+    }
+
     // 1. Xác thực Token quét được
     const sessionId = await qrService.verifyToken(token);
     if (!sessionId) {

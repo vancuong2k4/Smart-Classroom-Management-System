@@ -34,30 +34,60 @@ const parseLecturerId = (lecturerId) => {
     return lecturerId;
 };
 
+const parseTotalSessions = (val, isRequired = false) => {
+    if (val === undefined || val === null) {
+        return isRequired ? 10 : undefined;
+    }
+    const n = Number(val);
+    if (!Number.isInteger(n) || n <= 0 || n > 100) {
+        throw new AppError('total_sessions must be an integer between 1 and 100', 400);
+    }
+    return n;
+};
+
+const parseMaxAbsences = (val, isRequired = false) => {
+    if (val === undefined || val === null) {
+        return isRequired ? 2 : undefined;
+    }
+    const n = Number(val);
+    if (!Number.isInteger(n) || n < 0 || n > 100) {
+        throw new AppError('max_absences must be a non-negative integer (>= 0)', 400);
+    }
+    return n;
+};
+
 const validateCreateCourse = (req, res, next) => {
     const rawLecturerId = req.body?.lecturer_id !== undefined ? req.body.lecturer_id : req.body?.lecturerId;
+    const rawTotalSessions = req.body?.total_sessions !== undefined ? req.body.total_sessions : req.body?.totalSessions;
+    const rawMaxAbsences = req.body?.max_absences !== undefined ? req.body.max_absences : req.body?.maxAbsences;
     const { code, name } = req.body || {};
 
     req.body = {
         code: parseCode(code),
         name: parseName(name),
         lecturerId: rawLecturerId === undefined ? undefined : parseLecturerId(rawLecturerId),
+        totalSessions: parseTotalSessions(rawTotalSessions, true),
+        maxAbsences: parseMaxAbsences(rawMaxAbsences, true),
     };
     next();
 };
 
 const validateUpdateCourse = (req, res, next) => {
     const rawLecturerId = req.body?.lecturer_id !== undefined ? req.body.lecturer_id : req.body?.lecturerId;
+    const rawTotalSessions = req.body?.total_sessions !== undefined ? req.body.total_sessions : req.body?.totalSessions;
+    const rawMaxAbsences = req.body?.max_absences !== undefined ? req.body.max_absences : req.body?.maxAbsences;
     const { code, name } = req.body || {};
 
-    if (code === undefined && name === undefined && rawLecturerId === undefined) {
-        throw new AppError('At least one of code, name, lecturer_id is required', 400);
+    if (code === undefined && name === undefined && rawLecturerId === undefined && rawTotalSessions === undefined && rawMaxAbsences === undefined) {
+        throw new AppError('At least one of code, name, lecturer_id, total_sessions, max_absences is required', 400);
     }
 
     req.body = {
         code: code === undefined ? undefined : parseCode(code),
         name: name === undefined ? undefined : parseName(name),
         lecturerId: rawLecturerId === undefined ? undefined : parseLecturerId(rawLecturerId),
+        totalSessions: parseTotalSessions(rawTotalSessions, false),
+        maxAbsences: parseMaxAbsences(rawMaxAbsences, false),
     };
     next();
 };

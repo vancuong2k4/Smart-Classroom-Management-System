@@ -16,7 +16,7 @@ app.use(helmet());
 // CORS: Cho phép các ứng dụng Frontend (Web/Mobile) gọi API mà không bị chặn
 app.use(cors({
     origin: '*', // Mặc định mở. Trong production nên thay bằng domain thực tế.
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -40,9 +40,11 @@ const checkinLimiter = rateLimit({
 app.use('/api/attendance/checkin', checkinLimiter);
 
 // ==========================================
-// 3. CORE MIDDLEWARES & ROUTES
+// 3. CORE MIDDLEWARES & BODY PARSERS
 // ==========================================
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.text({ type: ['text/csv', 'text/plain'], limit: '10mb' }));
 
 app.use('/api', routes);
 

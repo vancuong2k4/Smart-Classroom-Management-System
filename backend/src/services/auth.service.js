@@ -37,7 +37,7 @@ const generateToken = (user) => {
  * Dùng chung cho: API đăng ký (register) và script seed tài khoản ADMIN.
  * @returns {Promise<object>} user (không có password_hash)
  */
-const createAccount = async ({ username, password, role }) => {
+const createAccount = async ({ username, password, role, fullName = null, email = null }) => {
     const existing = await userModel.findByUsername(username);
     if (existing) {
         throw new AppError('Username already exists', 409);
@@ -48,7 +48,7 @@ const createAccount = async ({ username, password, role }) => {
     const passwordHash = await bcrypt.hash(password, jwtConfig.saltRounds);
 
     try {
-        return await userModel.create({ username, passwordHash, role });
+        return await userModel.create({ username, passwordHash, role, fullName, email });
     } catch (err) {
         // Phòng trường hợp 2 request đăng ký cùng username chạy song song (race condition):
         // cả hai đều qua bước kiểm tra ở trên, nhưng DB UNIQUE constraint sẽ chặn request thứ 2.
@@ -63,8 +63,8 @@ const createAccount = async ({ username, password, role }) => {
  * Đăng ký tài khoản mới.
  * @returns {Promise<{user: object, token: string}>}
  */
-const register = async ({ username, password, role }) => {
-    const user = await createAccount({ username, password, role });
+const register = async ({ username, password, role, fullName, email }) => {
+    const user = await createAccount({ username, password, role, fullName, email });
     return { user, token: generateToken(user) };
 };
 
@@ -80,6 +80,10 @@ const login = async ({ username, password }) => {
     const isMatch = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
     if (!user || !isMatch) {
         throw new AppError('Invalid username or password', 401);
+    }
+
+    if (user.is_locked) {
+        throw new AppError('Tài khoản đã bị khóa. Vui lòng liên hệ Admin!', 403);
     }
 
     // Loại bỏ password_hash trước khi trả về

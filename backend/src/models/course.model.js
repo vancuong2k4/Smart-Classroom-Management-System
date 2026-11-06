@@ -4,7 +4,7 @@
 const pool = require('../config/database');
 
 /**
- * Câu SELECT gốc: kèm username giảng viên và sĩ số lớp
+ * Câu SELECT gốc: kèm username giảng viên, sĩ số lớp, tổng số buổi và số buổi vắng tối đa
  * để Frontend hiển thị luôn mà không phải gọi thêm API.
  */
 const BASE_SELECT = `
@@ -14,19 +14,26 @@ const BASE_SELECT = `
            c.lecturer_id,
            u.username AS lecturer_username,
            (SELECT COUNT(*)::int FROM enrollments e WHERE e.course_id = c.id) AS student_count,
+           c.total_sessions,
+           c.max_absences,
            c.created_at
     FROM courses c
     LEFT JOIN users u ON u.id = c.lecturer_id
 `;
 
 /**
- * Ánh xạ field (camelCase ở tầng Service) -> tên cột DB.
+ * Ánh xạ field (camelCase hoặc snake_case) -> tên cột DB.
  * Chỉ các cột trong whitelist này mới được phép UPDATE => an toàn khi ghép chuỗi SQL động.
  */
 const UPDATABLE_COLUMNS = {
     code: 'code',
     name: 'name',
     lecturerId: 'lecturer_id',
+    lecturer_id: 'lecturer_id',
+    totalSessions: 'total_sessions',
+    total_sessions: 'total_sessions',
+    maxAbsences: 'max_absences',
+    max_absences: 'max_absences',
 };
 
 const findById = async (id) => {
@@ -60,12 +67,12 @@ const findByStudent = async (studentId) => {
 /**
  * @returns {Promise<number>} id của lớp vừa tạo
  */
-const create = async ({ code, name, lecturerId }) => {
+const create = async ({ code, name, lecturerId, totalSessions = 10, maxAbsences = 2 }) => {
     const { rows } = await pool.query(
-        `INSERT INTO courses (code, name, lecturer_id)
-         VALUES ($1, $2, $3)
+        `INSERT INTO courses (code, name, lecturer_id, total_sessions, max_absences)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [code, name, lecturerId]
+        [code, name, lecturerId, totalSessions, maxAbsences]
     );
     return rows[0].id;
 };

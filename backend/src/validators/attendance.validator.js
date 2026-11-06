@@ -2,7 +2,7 @@ const AppError = require('../utils/AppError');
 const net = require('net');
 
 const validateCheckin = (req, res, next) => {
-    const { token, latitude, longitude, ip_address } = req.body;
+    const { token, latitude, longitude, ip_address, deviceId, device_id } = req.body || {};
 
     if (typeof token !== 'string' || token.trim() === '') {
         throw new AppError('QR token is required', 400);
@@ -13,17 +13,22 @@ const validateCheckin = (req, res, next) => {
     if (typeof longitude !== 'number' || longitude < -180 || longitude > 180) {
         throw new AppError('longitude must be a number between -180 and 180', 400);
     }
+
+    const rawDeviceId = deviceId !== undefined ? deviceId : device_id;
+    if (typeof rawDeviceId !== 'string' || rawDeviceId.trim() === '') {
+        throw new AppError('Mã định danh thiết bị (deviceId) là bắt buộc khi điểm danh', 400);
+    }
     
     // Lấy IP từ payload (cho mục đích giả lập/test) hoặc từ Request thực tế
     let clientIp = ip_address;
     if (!clientIp) {
-        clientIp = req.ip || req.connection.remoteAddress;
-        if (clientIp.startsWith('::ffff:')) {
+        clientIp = req.ip || req.connection?.remoteAddress;
+        if (clientIp && clientIp.startsWith('::ffff:')) {
             clientIp = clientIp.substring(7); // Dọn dẹp IPv4-mapped IPv6
         }
     }
 
-    if (!net.isIP(clientIp)) {
+    if (!clientIp || !net.isIP(clientIp)) {
         throw new AppError('Invalid IP address', 400);
     }
 
@@ -31,7 +36,8 @@ const validateCheckin = (req, res, next) => {
         token: token.trim(), 
         latitude, 
         longitude, 
-        ipAddress: clientIp 
+        ipAddress: clientIp,
+        deviceId: rawDeviceId.trim(),
     };
     
     next();
