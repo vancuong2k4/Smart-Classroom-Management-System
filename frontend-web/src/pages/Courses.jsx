@@ -1,8 +1,31 @@
-import { useState, useEffect } from 'react';
-import { Plus, Search, BookOpen, Users, UserPlus, X, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { 
+  Plus, 
+  Search, 
+  BookOpen, 
+  Users, 
+  UserPlus, 
+  X, 
+  Trash2, 
+  Loader2, 
+  AlertCircle,
+  GraduationCap,
+  UserCheck 
+} from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
 function Courses() {
+  // 1. Đọc currentUser từ localStorage.getItem('user') để xác định isAdmin
+  let currentUser = null;
+  try {
+    const userString = localStorage.getItem('user');
+    currentUser = userString ? JSON.parse(userString) : null;
+  } catch (error) {
+    console.error('Lỗi khi đọc currentUser từ localStorage:', error);
+  }
+  const role = (currentUser?.role || '').toUpperCase();
+  const isAdmin = role === 'ADMIN';
+
   // Trạng thái lưu từ khóa tìm kiếm môn học
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -15,8 +38,15 @@ function Courses() {
   // Trạng thái Form tạo lớp học phần mới
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseCode, setNewCourseCode] = useState('');
+  const [newCourseLecturerId, setNewCourseLecturerId] = useState('');
   const [submittingCourse, setSubmittingCourse] = useState(false);
   const [createCourseError, setCreateCourseError] = useState('');
+
+  // Trạng thái Modal & Form Phân công lại giảng viên (Reassign Lecturer - ADMIN)
+  const [reassignCourse, setReassignCourse] = useState(null);
+  const [reassignLecturerId, setReassignLecturerId] = useState('');
+  const [submittingReassign, setSubmittingReassign] = useState(false);
+  const [reassignError, setReassignError] = useState('');
 
   // Trạng thái Form nhập thêm sinh viên (Username / MSSV)
   const [studentInput, setStudentInput] = useState('');
@@ -30,39 +60,70 @@ function Courses() {
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
-  // 1. Tải danh sách lớp học thật từ Backend khi component mount
-  const fetchCourses = async () => {
+  // 3. Lấy danh sách giảng viên (Nếu là Admin): GET /api/users?role=LECTURER
+  const [lecturers, setLecturers] = useState([]);
+
+  const fetchLecturers = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const res = await axiosClient.get('/users?role=LECTURER');
+      const list = res.data?.data?.users || res.data?.users || res.users || [];
+      setLecturers(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách giảng viên:', err);
+      setLecturers([]);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      const loadLecturers = async () => {
+        await fetchLecturers();
+      };
+      loadLecturers();
+    }
+  }, [isAdmin, fetchLecturers]);
+
+  // Tải danh sách lớp học thật từ Backend khi component mount
+  const fetchCourses = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const response = await axiosClient.get('/courses');
-      const courseList = response.data?.courses || response?.courses || (Array.isArray(response) ? response : []);
-      setCourses(courseList);
-      if (courseList.length > 0) {
+      const courseList = response.data?.courses || response?.courses || response.data || (Array.isArray(response) ? response : []);
+      const validCourses = Array.isArray(courseList) ? courseList : [];
+      setCourses(validCourses);
+      if (validCourses.length > 0) {
         setSelectedCourse((prev) => {
-          if (!prev) return courseList[0];
-          const matched = courseList.find((c) => c.id === prev.id);
-          return matched || courseList[0];
+          if (!prev) return validCourses[0];
+          const matched = validCourses.find((c) => c.id === prev.id);
+          return matched || validCourses[0];
         });
       } else {
         setSelectedCourse(null);
       }
     } catch (err) {
       console.error('Lỗi khi tải danh sách lớp học:', err);
-      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể tải danh sách khóa học.';
+      const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Không thể tải danh sách khóa học.';
       setError(errMsg);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchCourses();
   }, []);
 
+  useEffect(() => {
+    const loadCourses = async () => {
+      await fetchCourses();
+    };
+    loadCourses();
+  }, [fetchCourses]);
+
   // Tải danh sách sinh viên khi chọn lớp học phần
-  const fetchStudents = async (courseId) => {
-    if (!courseId) return;
+  const fetchStudents = useCallback(async (courseId) => {
+    if (!courseId) {
+      setStudents([]);
+      return;
+    }
     setLoadingStudents(true);
     try {
       const response = await axiosClient.get(`/courses/${courseId}/students`);
@@ -74,48 +135,131 @@ function Courses() {
     } finally {
       setLoadingStudents(false);
     }
-  };
+  }, []);
+
+  const selectedCourseId = selectedCourse?.id;
 
   useEffect(() => {
-    if (selectedCourse?.id) {
-      fetchStudents(selectedCourse.id);
-    } else {
-      setStudents([]);
-    }
-  }, [selectedCourse?.id]);
+    const loadStudents = async () => {
+      await fetchStudents(selectedCourseId);
+    };
+    loadStudents();
+  }, [selectedCourseId, fetchStudents]);
 
-  // 2. Tạo lớp học phần mới và lưu trực tiếp vào database qua API
+  // 4. Modal "Thêm khóa học":
+  // - Chuẩn hóa payload: code (trim()), name (trim())
+  // - Nếu là ADMIN và có chọn giảng viên: gửi thêm lecturerId: Number(newCourseLecturerId)
+  // - Nếu là LECTURER (hoặc Admin không chọn GV): chỉ gửi { code, name }
   const handleCreateCourse = async (e) => {
     e.preventDefault();
-    if (!newCourseName.trim() || !newCourseCode.trim()) return;
+    const code = newCourseCode.trim();
+    const name = newCourseName.trim();
+
+    if (!code || !name) {
+      const msg = 'Vui lòng nhập đầy đủ mã lớp và tên môn học!';
+      setCreateCourseError(msg);
+      alert(msg);
+      return;
+    }
 
     setSubmittingCourse(true);
     setCreateCourseError('');
 
-    const newCourse = {
-      code: newCourseCode.toUpperCase().trim(),
-      name: newCourseName.trim(),
+    const payload = {
+      code,
+      name,
     };
 
+    if (isAdmin && newCourseLecturerId) {
+      const lecturerId = Number(newCourseLecturerId);
+      payload.lecturerId = lecturerId;
+      payload.lecturer_id = lecturerId;
+    }
+
     try {
-      const response = await axiosClient.post('/courses', newCourse);
+      const response = await axiosClient.post('/courses', payload);
       const createdCourse = response.data?.course || response?.course || response.data || response;
 
-      // Cập nhật danh sách và chọn lớp vừa tạo
-      setCourses((prev) => [createdCourse, ...prev]);
-      setSelectedCourse(createdCourse);
       setNewCourseName('');
       setNewCourseCode('');
+      setNewCourseLecturerId('');
       setShowAddCourseModal(false);
+      await fetchCourses();
+      if (createdCourse?.id) {
+        setSelectedCourse(createdCourse);
+      }
     } catch (err) {
       console.error('Lỗi khi tạo lớp học:', err);
       const errMsg =
         err.response?.data?.message ||
         err.response?.data?.error ||
+        err.message ||
         'Không thể tạo lớp học mới. Vui lòng kiểm tra lại thông tin!';
       setCreateCourseError(errMsg);
+      alert(`Lỗi tạo lớp học: ${errMsg}`);
     } finally {
       setSubmittingCourse(false);
+    }
+  };
+
+  // 5. Nút "Phân công lại" (Reassign Lecturer - ADMIN)
+  const handleOpenReassignModal = (course) => {
+    setReassignCourse(course);
+    setReassignLecturerId(course.lecturer_id || course.lecturerId || '');
+    setReassignError('');
+  };
+
+  const handleReassignLecturer = async (e) => {
+    e.preventDefault();
+    if (!reassignCourse?.id) return;
+
+    setSubmittingReassign(true);
+    setReassignError('');
+
+    const selectedId = reassignLecturerId ? Number(reassignLecturerId) : null;
+    const body = {
+      lecturerId: selectedId ? Number(selectedId) : null,
+      lecturer_id: selectedId ? Number(selectedId) : null,
+    };
+
+    try {
+      await axiosClient.patch(`/courses/${reassignCourse.id}`, body);
+      setReassignCourse(null);
+      await fetchCourses();
+    } catch (err) {
+      console.error('Lỗi khi phân công lại giảng viên:', err);
+      const errMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Không thể phân công lại giảng viên!';
+      setReassignError(errMsg);
+      alert(`Lỗi phân công lại: ${errMsg}`);
+    } finally {
+      setSubmittingReassign(false);
+    }
+  };
+
+  // 6. Nút "Xóa lớp học" (Delete Course - ADMIN)
+  const handleDeleteCourse = async (courseId, courseName) => {
+    if (!isAdmin) return;
+    if (window.confirm(`Bạn có chắc chắn muốn xóa lớp học "${courseName || courseId}"?`)) {
+      try {
+        await axiosClient.delete(`/courses/${courseId}`);
+        if (selectedCourse?.id === courseId) {
+          setSelectedCourse(null);
+          setStudents([]);
+        }
+        await fetchCourses();
+      } catch (err) {
+        console.error('Lỗi khi xóa lớp học:', err);
+        const errMsg =
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          'Không thể xóa lớp học phần này!';
+        alert(errMsg);
+      }
     }
   };
 
@@ -134,7 +278,7 @@ function Courses() {
       fetchCourses();
     } catch (err) {
       console.error('Lỗi khi thêm sinh viên:', err);
-      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể thêm sinh viên vào lớp học!';
+      const errMsg = err.response?.data?.message || err.message || 'Không thể thêm sinh viên vào lớp học!';
       alert(errMsg);
     }
   };
@@ -149,7 +293,7 @@ function Courses() {
         fetchCourses();
       } catch (err) {
         console.error('Lỗi khi xóa sinh viên:', err);
-        const errMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể xóa sinh viên khỏi lớp!';
+        const errMsg = err.response?.data?.message || err.message || 'Không thể xóa sinh viên khỏi lớp!';
         alert(errMsg);
       }
     }
@@ -169,11 +313,16 @@ function Courses() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#081c36', margin: '0 0 4px 0' }}>Quản lý Khóa học & Lớp học phần</h1>
-          <p style={{ fontSize: '13px', color: '#7589a3', margin: 0 }}>Danh sách các lớp học phần và quản lý tiến trình điểm danh sinh viên.</p>
+          <p style={{ fontSize: '13px', color: '#7589a3', margin: 0 }}>
+            {isAdmin 
+              ? 'Chế độ Quản trị viên: Quản lý toàn bộ lớp học, phân công giảng viên và cấu hình môn học.' 
+              : 'Danh sách các lớp học phần phụ trách và quản lý tiến trình điểm danh sinh viên.'}
+          </p>
         </div>
         <button 
           onClick={() => {
             setCreateCourseError('');
+            setNewCourseLecturerId('');
             setShowAddCourseModal(true);
           }}
           style={{ backgroundColor: '#0068ff', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0, 104, 255, 0.2)' }}
@@ -220,36 +369,118 @@ function Courses() {
           <p style={{ fontSize: '13px', color: '#7589a3', margin: 0 }}>Nhấn nút "Thêm Khóa học" để khởi tạo lớp học phần mới trên hệ thống.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-          {filteredCourses.map((course) => (
-            <div 
-              key={course.id}
-              onClick={() => setSelectedCourse(course)}
-              style={{ 
-                backgroundColor: '#ffffff', 
-                border: selectedCourse?.id === course.id ? '2px solid #0068ff' : '1px solid #e1e4e8', 
-                borderRadius: '16px', 
-                padding: '20px', 
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#e5efff', color: '#0068ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <BookOpen size={20} />
-                </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+          {filteredCourses.map((course) => {
+            const isUnassigned = course.lecturer_id === null || course.lecturerId === null || (!course.lecturer_id && !course.lecturerId);
+            return (
+              <div 
+                key={course.id}
+                onClick={() => setSelectedCourse(course)}
+                style={{ 
+                  backgroundColor: '#ffffff', 
+                  border: selectedCourse?.id === course.id ? '2px solid #0068ff' : '1px solid #e1e4e8', 
+                  borderRadius: '16px', 
+                  padding: '20px', 
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}
+              >
                 <div>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#0068ff', backgroundColor: '#e5efff', padding: '2px 8px', borderRadius: '6px' }}>{course.code}</span>
-                  <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#081c36', margin: '4px 0 0 0' }}>{course.name}</h3>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#e5efff', color: '#0068ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <BookOpen size={20} />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#0068ff', backgroundColor: '#e5efff', padding: '2px 8px', borderRadius: '6px' }}>{course.code}</span>
+                        <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#081c36', margin: '4px 0 0 0' }}>{course.name}</h3>
+                      </div>
+                    </div>
+
+                    {/* 6. Nút Xóa lớp học (chỉ hiển thị cho ADMIN) */}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCourse(course.id, course.name);
+                        }}
+                        title="Xóa lớp học (Admin)"
+                        style={{
+                          backgroundColor: '#fef2f2',
+                          color: '#ef4444',
+                          border: '1px solid #fecaca',
+                          borderRadius: '8px',
+                          padding: '6px 8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 2. Hiển thị thông tin giảng viên trên thẻ lớp học */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', margin: '12px 0 6px 0', fontSize: '12px', backgroundColor: '#f8fafc', padding: '8px 10px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#334155' }}>
+                      <GraduationCap size={14} style={{ color: '#0068ff', flexShrink: 0 }} />
+                      <span>Giảng viên: {course.lecturer_username || 'Chưa phân công'}</span>
+                    </div>
+                    {isUnassigned && (
+                      <span style={{ fontSize: '11px', fontWeight: '600', backgroundColor: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '2px 8px', borderRadius: '6px' }}>
+                        Chưa phân công
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer thẻ lớp: Sĩ số & Nút Phân công lại cho ADMIN */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '12px', color: '#7589a3', borderTop: '1px solid #f0f2f5', paddingTop: '12px', marginTop: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Users size={14} />
+                    <span>Sĩ số: {selectedCourse?.id === course.id ? students.length : (course.student_count ?? course.totalStudents ?? 0)} sinh viên</span>
+                  </div>
+
+                  {/* 5. Nút Phân công lại (chỉ hiển thị cho ADMIN) */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenReassignModal(course);
+                      }}
+                      title="Phân công lại giảng viên"
+                      style={{
+                        backgroundColor: '#eff6ff',
+                        color: '#0068ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '8px',
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <UserCheck size={13} />
+                      Phân công lại
+                    </button>
+                  )}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#7589a3', borderTop: '1px solid #f0f2f5', paddingTop: '12px', marginTop: '12px' }}>
-                <Users size={14} />
-                <span>Sĩ số: {selectedCourse?.id === course.id ? students.length : (course.student_count ?? course.totalStudents ?? 0)} sinh viên</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -258,10 +489,19 @@ function Courses() {
         <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px', borderBottom: '1px solid #e1e4e8', paddingBottom: '16px' }}>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#081c36', margin: 0 }}>
-                Danh sách Sinh viên: {selectedCourse.name}
-              </h2>
-              <p style={{ fontSize: '12px', color: '#7589a3', margin: '2px 0 0 0' }}>Mã lớp: <strong>{selectedCourse.code}</strong> — Quản lý danh sách sinh viên thuộc lớp học phần</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#081c36', margin: 0 }}>
+                  Danh sách Sinh viên: {selectedCourse.name}
+                </h2>
+                {(!selectedCourse.lecturer_id && !selectedCourse.lecturerId) && (
+                  <span style={{ fontSize: '11px', fontWeight: '600', backgroundColor: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '2px 8px', borderRadius: '6px' }}>
+                    Chưa phân công GV
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: '12px', color: '#7589a3', margin: '4px 0 0 0' }}>
+                Mã lớp: <strong>{selectedCourse.code}</strong> • Giảng viên: <strong>{selectedCourse.lecturer_username || 'Chưa phân công'}</strong>
+              </p>
             </div>
 
             {/* Form Thêm Sinh viên bằng MSSV/Username */}
@@ -315,6 +555,7 @@ function Courses() {
                         <button
                           onClick={() => handleDeleteStudent(student.id)}
                           style={{ backgroundColor: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
+                          title="Xóa sinh viên khỏi lớp"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -328,7 +569,7 @@ function Courses() {
         </div>
       )}
 
-      {/* Modal Popup Tạo Khóa Học Mới */}
+      {/* 4. Modal Tạo Khóa Học Mới */}
       {showAddCourseModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
           <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
@@ -371,6 +612,27 @@ function Courses() {
                 />
               </div>
 
+              {/* Dropdown Giảng viên phụ trách chỉ hiển thị nếu là ADMIN */}
+              {isAdmin && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#081c36', marginBottom: '4px' }}>
+                    Giảng viên phụ trách (Tùy chọn)
+                  </label>
+                  <select
+                    value={newCourseLecturerId}
+                    onChange={(e) => setNewCourseLecturerId(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e1e4e8', backgroundColor: '#f5f7fb', fontSize: '13px', outline: 'none' }}
+                  >
+                    <option value="">-- Chưa phân công --</option>
+                    {lecturers.map((lecturer) => (
+                      <option key={lecturer.id} value={lecturer.id}>
+                        {lecturer.username} {lecturer.fullName ? `(${lecturer.fullName})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
                 <button
                   type="button"
@@ -385,6 +647,70 @@ function Courses() {
                   style={{ backgroundColor: '#0068ff', color: '#ffffff', border: 'none', borderRadius: '10px', padding: '10px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: submittingCourse ? 0.7 : 1 }}
                 >
                   {submittingCourse ? 'Đang tạo...' : 'Tạo lớp ngay'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Modal Phân Công Lại Giảng Viên (Reassign Lecturer - ADMIN) */}
+      {reassignCourse && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#081c36', margin: 0 }}>Phân Công Giảng Viên</h3>
+                <p style={{ fontSize: '12px', color: '#7589a3', margin: '2px 0 0 0' }}>Lớp: <strong>{reassignCourse.code}</strong> - {reassignCourse.name}</p>
+              </div>
+              <button onClick={() => setReassignCourse(null)} style={{ background: 'none', border: 'none', color: '#7589a3', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {reassignError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', color: '#ef4444', fontSize: '12px', marginBottom: '14px' }}>
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{reassignError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleReassignLecturer} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#081c36', marginBottom: '4px' }}>
+                  Chọn giảng viên mới
+                </label>
+                <select
+                  value={reassignLecturerId}
+                  onChange={(e) => setReassignLecturerId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e1e4e8', backgroundColor: '#f5f7fb', fontSize: '13px', outline: 'none' }}
+                >
+                  <option value="">-- Chưa phân công (Hủy phân công) --</option>
+                  {lecturers.map((lecturer) => (
+                    <option key={lecturer.id} value={lecturer.id}>
+                      {lecturer.username} {lecturer.fullName ? `(${lecturer.fullName})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '11px', color: '#7589a3', marginTop: '4px', display: 'block' }}>
+                  Chọn rỗng để hủy phân công giảng viên cho lớp học này.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setReassignCourse(null)}
+                  style={{ backgroundColor: '#f5f7fb', color: '#081c36', border: '1px solid #e1e4e8', borderRadius: '10px', padding: '10px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReassign}
+                  style={{ backgroundColor: '#0068ff', color: '#ffffff', border: 'none', borderRadius: '10px', padding: '10px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: submittingReassign ? 0.7 : 1 }}
+                >
+                  {submittingReassign ? 'Đang lưu...' : 'Lưu phân công'}
                 </button>
               </div>
             </form>
