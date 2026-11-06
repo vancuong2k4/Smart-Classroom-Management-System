@@ -44,16 +44,14 @@ function createServer(port) {
             return;
           }
 
-          const isAdmin = username.toLowerCase() === 'admin';
           const user = {
             ...mockUser,
             username: username || mockUser.username,
-            fullName: isAdmin ? 'Quản trị viên hệ thống' : (username === 'gv_nguyenan' ? mockUser.fullName : `Giảng viên ${username}`),
-            role: isAdmin ? 'ADMIN' : 'LECTURER',
+            fullName: username === 'gv_nguyenan' ? mockUser.fullName : `Giảng viên ${username}`,
           };
           const token = generateMockToken(user);
 
-          console.log(`[Mock Server] [200 OK] Đăng nhập: ${user.fullName} (${user.role})`);
+          console.log(`[Mock Server] [200 OK] Đăng nhập: ${user.fullName}`);
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(
@@ -61,9 +59,7 @@ function createServer(port) {
               success: true,
               message: 'Đăng nhập thành công',
               token,
-              accessToken: token,
               user,
-              data: { token, accessToken: token, user },
             })
           );
         } catch {
@@ -72,22 +68,6 @@ function createServer(port) {
           res.end(JSON.stringify({ success: false, message: 'Body JSON không hợp lệ' }));
         }
       });
-      return;
-    }
-
-    // 1.1 Mock API GET /api/auth/me
-    if (url === '/api/auth/me' && req.method === 'GET') {
-      const authHeader = req.headers['authorization'] || '';
-      const isAdmin = authHeader.includes('admin') || authHeader.includes('ADMIN');
-      const user = {
-        ...mockUser,
-        username: isAdmin ? 'admin' : mockUser.username,
-        fullName: isAdmin ? 'Quản trị viên hệ thống' : mockUser.fullName,
-        role: isAdmin ? 'ADMIN' : 'LECTURER',
-      };
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ success: true, user, data: { user } }));
       return;
     }
 
@@ -257,68 +237,6 @@ function createServer(port) {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.end(JSON.stringify({ success: true, message: 'Đăng xuất thành công' }));
-      return;
-    }
-
-    // 8. Mock API GET /api/users?role=LECTURER
-    if (url === '/api/users' && req.method === 'GET') {
-      const mockLecturersList = [
-        { id: 1, username: 'gv_nguyenan', fullName: 'TS. Nguyễn Văn An', role: 'LECTURER' },
-        { id: 2, username: 'gv_lethanh', fullName: 'ThS. Lê Thành', role: 'LECTURER' },
-        { id: 3, username: 'gv_tranthu', fullName: 'ThS. Trần Thị Thu', role: 'LECTURER' },
-      ];
-      console.log(`[Mock Server] [200 OK] Lấy danh sách giảng viên (${mockLecturersList.length} giảng viên)`);
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ success: true, data: { users: mockLecturersList } }));
-      return;
-    }
-
-    // 9. Mock API PATCH /api/courses/:id (Phân công lại giảng viên)
-    const matchPatchCourse = url.match(/^\/api\/courses\/([^/]+)\/?$/);
-    if (matchPatchCourse && req.method === 'PATCH') {
-      const courseId = matchPatchCourse[1];
-      let bodyStr = '';
-      req.on('data', (chunk) => { bodyStr += chunk; });
-      req.on('end', () => {
-        try {
-          const body = bodyStr ? JSON.parse(bodyStr) : {};
-          const course = mockCourses.find((c) => c.id === courseId || String(c.id) === courseId);
-          if (course) {
-            const lecturerId = body.lecturerId !== undefined ? body.lecturerId : body.lecturer_id;
-            course.lecturer_id = lecturerId;
-            course.lecturerId = lecturerId;
-            const mockLecturersList = [
-              { id: 1, username: 'gv_nguyenan' },
-              { id: 2, username: 'gv_lethanh' },
-              { id: 3, username: 'gv_tranthu' },
-            ];
-            const found = mockLecturersList.find((l) => l.id === Number(lecturerId));
-            course.lecturer_username = found ? found.username : null;
-          }
-          res.statusCode = 200;
-          res.setHeader('Content-Type', 'application/json; charset=utf-8');
-          res.end(JSON.stringify({ success: true, message: 'Cập nhật phân công giảng viên thành công!', data: { course } }));
-        } catch {
-          res.statusCode = 400;
-          res.setHeader('Content-Type', 'application/json; charset=utf-8');
-          res.end(JSON.stringify({ success: false, message: 'Dữ liệu không hợp lệ' }));
-        }
-      });
-      return;
-    }
-
-    // 10. Mock API DELETE /api/courses/:id (Xóa khóa học)
-    const matchDeleteCourse = url.match(/^\/api\/courses\/([^/]+)\/?$/);
-    if (matchDeleteCourse && req.method === 'DELETE') {
-      const courseId = matchDeleteCourse[1];
-      const idx = mockCourses.findIndex((c) => c.id === courseId || String(c.id) === courseId);
-      if (idx !== -1) {
-        mockCourses.splice(idx, 1);
-      }
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ success: true, message: 'Xóa lớp học phần thành công!' }));
       return;
     }
 
