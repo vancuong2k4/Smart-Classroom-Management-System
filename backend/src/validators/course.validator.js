@@ -76,16 +76,13 @@ const validateAddStudents = (req, res, next) => {
         || usernames.length > MAX_USERNAMES_PER_REQUEST) {
         throw new AppError(`usernames must be a non-empty array (max ${MAX_USERNAMES_PER_REQUEST} items)`, 400);
     }
-
-    const cleaned = [];
-    for (const u of usernames) {
-        if (typeof u !== 'string' || !u.trim()) {
-            throw new AppError('Each username must be a non-empty string', 400);
-        }
-        cleaned.push(u.trim().toLowerCase());
+    if (!usernames.every((u) => typeof u === 'string' && u.trim())) {
+        throw new AppError('Each username must be a non-empty string', 400);
     }
 
-    req.body = { usernames: cleaned };
+    req.body = {
+        usernames: usernames.map((u) => u.trim().toLowerCase()),
+    };
     next();
 };
 

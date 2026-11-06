@@ -100,30 +100,32 @@ function Layout({ onLogout }) {
               </div>
             </NavLink>
 
-            {/* Menu "Máy chiếu QR": Hiển thị cố định trên Sidebar để mở màn hình chiếu điểm danh */}
-            <NavLink
-              to="/qr-projector"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 14px',
-                borderRadius: '12px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#ffffff',
-                textDecoration: 'none',
-                backgroundColor: isActive ? '#0040a8' : 'transparent',
-                boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                transition: 'all 0.2s ease'
-              })}
-            >
-              <QrCode size={20} />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span>Máy chiếu QR</span>
-                <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Điểm danh thời gian thực</span>
-              </div>
-            </NavLink>
+            {/* Menu "Máy chiếu QR": Chỉ hiển thị cho Giảng viên, ẩn khi là Admin */}
+            {!isAdmin && (
+              <NavLink
+                to="/qr-projector"
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  textDecoration: 'none',
+                  backgroundColor: isActive ? '#0040a8' : 'transparent',
+                  boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                  transition: 'all 0.2s ease'
+                })}
+              >
+                <QrCode size={20} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Máy chiếu QR</span>
+                  <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Điểm danh thời gian thực</span>
+                </div>
+              </NavLink>
+            )}
 
             {/* Menu "Thống kê" */}
             <NavLink

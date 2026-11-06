@@ -9,7 +9,6 @@ const courseRoutes = require('./course.routes');
 const sessionRoutes = require('./session.routes');
 const attendanceRoutes = require('./attendance.routes');
 const reportRoutes = require('./report.routes');
-const userRoutes = require('./user.routes');
 
 const router = express.Router();
 
@@ -19,6 +18,5 @@ router.use('/courses', courseRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/attendance', attendanceRoutes);
 router.use('/reports', reportRoutes);
-router.use('/users', userRoutes);
 
 module.exports = router;

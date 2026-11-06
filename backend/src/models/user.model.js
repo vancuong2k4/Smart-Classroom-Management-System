@@ -37,21 +37,6 @@ const findById = async (id) => {
     return rows[0] || null;
 };
 
-const findByRole = async (role) => {
-    const { rows } = await pool.query(
-        `SELECT ${PUBLIC_COLUMNS} FROM users WHERE role = $1 ORDER BY username ASC`,
-        [role]
-    );
-    return rows;
-};
-
-const findAll = async () => {
-    const { rows } = await pool.query(
-        `SELECT ${PUBLIC_COLUMNS} FROM users ORDER BY username ASC`
-    );
-    return rows;
-};
-
 /**
  * Tìm nhiều user cùng lúc theo danh sách username (1 câu query thay vì N câu).
  */
@@ -102,8 +87,6 @@ module.exports = {
     findByUsernameWithPassword,
     findByUsername,
     findById,
-    findByRole,
-    findAll,
     findByUsernames,
     create,
     findAll,

@@ -2,32 +2,28 @@ const AppError = require('../utils/AppError');
 const { normalizeCidr } = require('../utils/network');
 
 const validateOpenSession = (req, res, next) => {
-    const { latitude, longitude, ip_range, radius_meters, late_after_minutes, duration_minutes, durationMinutes } = req.body || {};
+    const { latitude, longitude, ip_range, radius_meters, late_after_minutes, duration_minutes } = req.body;
 
-    const lat = typeof latitude === 'number' ? latitude : 10.762622;
-    const lng = typeof longitude === 'number' ? longitude : 106.660172;
-
-    if (lat < -90 || lat > 90) {
+    if (typeof latitude !== 'number' || latitude < -90 || latitude > 90) {
         throw new AppError('latitude must be a number between -90 and 90', 400);
     }
-    if (lng < -180 || lng > 180) {
+    if (typeof longitude !== 'number' || longitude < -180 || longitude > 180) {
         throw new AppError('longitude must be a number between -180 and 180', 400);
     }
 
     let ipRange = null;
-    const rawIpRange = ip_range || process.env.SCHOOL_IP_RANGE || '0.0.0.0/0';
-    ipRange = normalizeCidr(rawIpRange);
-    if (!ipRange) throw new AppError('ip_range must be a valid IP or CIDR (e.g. 192.168.1.0/24)', 400);
-
-    const dur = duration_minutes !== undefined ? Number(duration_minutes) : (durationMinutes !== undefined ? Number(durationMinutes) : undefined);
+    if (ip_range !== undefined && ip_range !== null) {
+        ipRange = normalizeCidr(ip_range);
+        if (!ipRange) throw new AppError('ip_range must be a valid IP or CIDR (e.g. 192.168.1.0/24)', 400);
+    }
 
     req.body = {
-        latitude: lat,
-        longitude: lng,
+        latitude,
+        longitude,
         ipRange,
         radiusMeters: radius_meters !== undefined ? Number(radius_meters) : undefined,
         lateAfterMinutes: late_after_minutes !== undefined ? Number(late_after_minutes) : undefined,
-        durationMinutes: dur,
+        durationMinutes: duration_minutes !== undefined ? Number(duration_minutes) : undefined,
     };
     next();
 };
