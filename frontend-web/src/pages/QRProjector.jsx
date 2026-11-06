@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { QrCode, Play, Square, RefreshCw, Clock, ShieldCheck, Users, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { io } from 'socket.io-client';
@@ -26,45 +26,72 @@ function QRProjector() {
 
   // 1. Tải danh sách lớp học thật của giảng viên từ Database khi mở trang
   useEffect(() => {
+    let isMounted = true;
     const fetchCourses = async () => {
       try {
         const response = await axiosClient.get('/courses');
-        const courseList = response.data?.courses || response?.courses || (Array.isArray(response) ? response : []);
-        setCourses(courseList);
-        if (courseList.length > 0) {
-          setSelectedClass(courseList[0].id.toString());
+        const courseList = response.data?.courses || response?.courses || response.data || (Array.isArray(response) ? response : []);
+        if (isMounted) {
+          const valid = Array.isArray(courseList) ? courseList : [];
+          setCourses(valid);
+          if (valid.length > 0) {
+            setSelectedClass(valid[0].id.toString());
+          }
         }
       } catch (err) {
         console.error('Không thể tải danh sách khóa học:', err);
       }
     };
     fetchCourses();
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  // Dừng / Kết thúc phiên điểm danh
+  const handleStopSession = useCallback(async () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    if (currentSession?.id && selectedClass) {
+      try {
+        await axiosClient.post(`/courses/${selectedClass}/sessions/${currentSession.id}/close`);
+      } catch (err) {
+        console.warn('Đóng phiên ở backend gặp lỗi hoặc phiên đã kết thúc trước đó:', err);
+      }
+    }
+
+    setIsSessionActive(false);
+    setQrToken('');
+    setCurrentSession(null);
+  }, [currentSession, selectedClass]);
 
   // Đếm ngược thời gian đổi mã (10s) và thời gian phiên chiếu
   useEffect(() => {
-    let timer = null;
-    if (isSessionActive) {
-      timer = setInterval(() => {
-        setCountdown((prev) => (prev > 1 ? prev - 1 : 10));
+    if (!isSessionActive) return;
 
-        setSessionTimeLeft((prev) => {
-          if (prev <= 1) {
-            handleStopSession();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 1 ? prev - 1 : 10));
+      setSessionTimeLeft((prev) => {
+        if (prev <= 1) {
+          handleStopSession();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
     return () => clearInterval(timer);
-  }, [isSessionActive]);
+  }, [isSessionActive, handleStopSession]);
 
   // Dọn dẹp kết nối Socket khi unmount
   useEffect(() => {
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
+        socketRef.current = null;
       }
     };
   }, []);
@@ -81,32 +108,35 @@ function QRProjector() {
     setScannedStudents([]);
 
     try {
-      const latitude = Number(classLatitude);
-      const longitude = Number(classLongitude);
-      const radius = Number(radiusMeters);
-      if (!classLatitude.trim() || !classLongitude.trim() ||
-          !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
-          !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-        throw new Error('Vui lòng nhập tọa độ lớp hợp lệ.');
-      }
-      if (!Number.isFinite(radius) || radius < 10 || radius > 1000) {
-        throw new Error('Bán kính phải từ 10 đến 1000 mét.');
-      }
-      if (!allowedNetwork.trim()) {
-        throw new Error('Vui lòng nhập mạng IP được phép của lớp.');
-      }
-      if (/\/0$/.test(allowedNetwork.trim())) {
-        throw new Error('Vui lòng nhập mạng cụ thể, không dùng dải cho phép mọi IP.');
-      }
-      // 2. Gọi API POST /api/courses/${courseId}/sessions kèm durationMinutes
-      const response = await axiosClient.post(`/courses/${selectedClass}/sessions`, {
+      const payload = {
         durationMinutes: selectedDuration,
         duration_minutes: selectedDuration,
-        latitude,
-        longitude,
-        ip_range: allowedNetwork.trim(),
-        radius_meters: radius,
-      });
+      };
+
+      if (classLatitude.trim() && classLongitude.trim()) {
+        const latitude = Number(classLatitude);
+        const longitude = Number(classLongitude);
+        if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+            !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+          throw new Error('Vui lòng nhập tọa độ lớp hợp lệ.');
+        }
+        payload.latitude = latitude;
+        payload.longitude = longitude;
+      }
+
+      if (radiusMeters.trim()) {
+        const radius = Number(radiusMeters);
+        if (Number.isFinite(radius) && radius >= 10 && radius <= 1000) {
+          payload.radius_meters = radius;
+        }
+      }
+
+      if (allowedNetwork.trim()) {
+        payload.ip_range = allowedNetwork.trim();
+      }
+
+      // 2. Gọi API POST /courses/${courseId}/sessions kèm durationMinutes
+      const response = await axiosClient.post(`/courses/${selectedClass}/sessions`, payload);
 
       const session = response.data?.session || response?.session || response.data || response;
       const sessionId = session?.id;
@@ -120,9 +150,10 @@ function QRProjector() {
       setSessionTimeLeft(selectedDuration * 60);
       setCountdown(10);
 
-      // 3. Dùng socket.io-client kết nối tới http://localhost:3000 (gửi auth token từ localStorage)
+      // 3. Dùng socket.io-client kết nối tới Backend (gửi auth token từ localStorage)
+      const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
       const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
-      const socket = io('http://localhost:3000', {
+      const socket = io(socketUrl, {
         auth: { token },
         transports: ['websocket', 'polling'],
       });
@@ -137,7 +168,7 @@ function QRProjector() {
       // 5. Lắng nghe sự kiện 'new_qr' từ server bắn về để nhận chuỗi token QR thật
       socket.on('new_qr', (qrData) => {
         console.log('[Socket] Nhận mã QR động mới:', qrData);
-        const tokenStr = typeof qrData === 'string' ? qrData : qrData?.token || '';
+        const tokenStr = typeof qrData === 'string' ? qrData : qrData?.token || qrData?.qr_token || '';
         setQrToken(tokenStr);
         setCountdown(10);
       });
@@ -155,6 +186,7 @@ function QRProjector() {
         setQrToken('');
         if (socketRef.current) {
           socketRef.current.disconnect();
+          socketRef.current = null;
         }
       });
 
@@ -172,26 +204,6 @@ function QRProjector() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Dừng / Kết thúc phiên điểm danh
-  const handleStopSession = async () => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-
-    if (currentSession?.id && selectedClass) {
-      try {
-        await axiosClient.post(`/courses/${selectedClass}/sessions/${currentSession.id}/close`);
-      } catch (err) {
-        console.warn('Đóng phiên ở backend gặp lỗi hoặc phiên đã kết thúc trước đó:', err);
-      }
-    }
-
-    setIsSessionActive(false);
-    setQrToken('');
-    setCurrentSession(null);
   };
 
   // Format phút:giây
@@ -260,7 +272,7 @@ function QRProjector() {
             <fieldset disabled={isSessionActive || loading}
               style={{ border: '1px solid #e1e4e8', borderRadius: '12px', padding: '14px', margin: 0 }}>
               <legend style={{ color: '#081c36', fontWeight: 600, fontSize: '13px' }}>
-                Vị trí và phạm vi lớp học
+                Vị trí và phạm vi lớp học (Tùy chọn)
               </legend>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                 {[
@@ -277,8 +289,8 @@ function QRProjector() {
                   </label>
                 ))}
               </div>
-              <p style={{ fontSize: '12px', color: '#7589a3', marginBottom: 0 }}>
-                Nhập tọa độ tại lớp và dải mạng do quản trị viên cung cấp.
+              <p style={{ fontSize: '12px', color: '#7589a3', marginBottom: 0, marginTop: '8px' }}>
+                Để trống nếu muốn sử dụng tọa độ và dải mạng mặc định của trường.
               </p>
             </fieldset>
 
