@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, RefreshCw, Filter, CheckCircle2, Clock, XCircle, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
@@ -15,66 +15,52 @@ function Statistics() {
 
   // 1. Tải danh sách khóa học để hiển thị trong bộ lọc & đồng bộ courseId từ query params
   useEffect(() => {
-    let isMounted = true;
     const fetchCourses = async () => {
       try {
         const res = await axiosClient.get('/courses');
-        const list = res.data?.courses || res?.courses || res.data || (Array.isArray(res) ? res : []);
-        if (isMounted) {
-          const validCourses = Array.isArray(list) ? list : [];
-          setCourses(validCourses);
+        const list = res.data?.courses || res.courses || (Array.isArray(res) ? res : []);
+        setCourses(list);
 
-          if (queryCourseId) {
-            setSelectedClass(queryCourseId);
-          } else if (validCourses.length > 0) {
-            setSelectedClass(validCourses[0].id.toString());
-            setSearchParams({ courseId: validCourses[0].id.toString() });
-          }
+        if (queryCourseId) {
+          setSelectedClass(queryCourseId);
+        } else if (list.length > 0) {
+          setSelectedClass(list[0].id.toString());
+          setSearchParams({ courseId: list[0].id.toString() });
         }
       } catch (err) {
         console.error('Lỗi khi tải danh sách lớp học:', err);
       }
     };
     fetchCourses();
-    return () => {
-      isMounted = false;
-    };
   }, [queryCourseId, setSearchParams]);
 
   // 2. Gọi API GET: /api/reports/courses/${courseId} để lấy danh sách và thống kê điểm danh thật
-  const fetchReport = useCallback(async (courseId) => {
-    if (!courseId) {
-      setReportData([]);
-      return;
-    }
+  const fetchReport = async (courseId) => {
+    if (!courseId) return;
     setLoading(true);
     setError('');
     try {
       const res = await axiosClient.get(`/reports/courses/${courseId}`);
-      const data = res.data?.report || res?.report || res.data || (Array.isArray(res) ? res : []);
-      setReportData(Array.isArray(data) ? data : []);
+      const data = res.data?.report || res.report || (Array.isArray(res) ? res : []);
+      setReportData(data);
     } catch (err) {
       console.error('Lỗi khi tải báo cáo điểm danh:', err);
       const errMsg =
         err.response?.data?.message ||
         err.response?.data?.error ||
-        err.message ||
         'Không thể tải dữ liệu báo cáo điểm danh.';
       setError(errMsg);
       setReportData([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     if (selectedClass) {
-      const loadReport = async () => {
-        await fetchReport(selectedClass);
-      };
-      loadReport();
+      fetchReport(selectedClass);
     }
-  }, [selectedClass, fetchReport]);
+  }, [selectedClass]);
 
   // Xử lý khi người dùng đổi lớp học phần trong dropdown
   const handleClassChange = (e) => {
@@ -90,10 +76,10 @@ function Statistics() {
     return `${rate}%`;
   };
 
-  // 3. Link xuất CSV trỏ trực tiếp đến /api/reports/courses/${courseId}/export?token=...
+  // 3. Link xuất CSV trỏ trực tiếp đến http://localhost:3000/api/reports/courses/${courseId}/export?token=...
   const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
   const exportCsvUrl = selectedClass
-    ? `/api/reports/courses/${selectedClass}/export?token=${encodeURIComponent(token)}`
+    ? `http://localhost:3000/api/reports/courses/${selectedClass}/export?token=${encodeURIComponent(token)}`
     : '#';
 
   // Tổng số buổi học của lớp
