@@ -84,9 +84,11 @@ const create = async ({ code, name, lecturerId, totalSessions = 10, maxAbsences 
 const update = async (id, fields) => {
     const setClauses = [];
     const values = [];
+    const handledColumns = new Set();
 
     for (const [field, column] of Object.entries(UPDATABLE_COLUMNS)) {
-        if (fields[field] !== undefined) {
+        if (fields[field] !== undefined && !handledColumns.has(column)) {
+            handledColumns.add(column);
             values.push(fields[field]);
             setClauses.push(`${column} = $${values.length}`);
         }

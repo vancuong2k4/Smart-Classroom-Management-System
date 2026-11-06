@@ -43,6 +43,27 @@ const openSession = async (user, courseId, data) => {
             durationMinutes
         }, db);
 
+        // Tự động liên kết các đơn xin nghỉ phép đã được DUYỆT cho buổi học này và ghi nhận EXCUSED
+        await db.query(`
+            UPDATE leave_requests lr
+            SET session_id = s.id
+            FROM sessions s
+            WHERE s.id = $1
+              AND lr.course_id = $2
+              AND lr.requested_date = DATE(s.start_time AT TIME ZONE 'Asia/Ho_Chi_Minh')
+              AND lr.status = 'APPROVED'
+              AND lr.session_id IS NULL;
+        `, [sessionId, courseId]);
+
+        await db.query(`
+            INSERT INTO attendance_records (session_id, student_id, status)
+            SELECT $1, student_id, 'EXCUSED'::attendance_status
+            FROM leave_requests
+            WHERE session_id = $1 AND status = 'APPROVED'
+            ON CONFLICT (session_id, student_id)
+            DO UPDATE SET status = 'EXCUSED';
+        `, [sessionId]);
+
         return sessionModel.findById(sessionId, db);
     });
 };
