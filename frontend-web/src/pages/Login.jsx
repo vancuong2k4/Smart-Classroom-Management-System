@@ -5,7 +5,7 @@ import axiosClient from '../api/axiosClient';
 
 function Login({ onLoginSuccess }) {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('gv_nguyenan');
+  const [username, setUsername] = useState('tranthuntat1708@gmail.com');
   const [password, setPassword] = useState('123456');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -20,16 +20,19 @@ function Login({ onLoginSuccess }) {
       const response = await axiosClient.post('/auth/login', { username, password });
       
       const token = response.data?.token || response?.token || response.data?.accessToken || response?.accessToken;
-      const userData = response.data?.user || response?.user || response.data?.data?.user;
+      const userData = response.data?.user || response?.user || {
+        fullName: 'Giảng viên',
+        username: username,
+        role: 'Giảng viên',
+        code: 'GV-2026'
+      };
 
       if (!token) {
-        throw new Error(response.data?.message || response?.message || 'Không nhận được mã xác thực (token) từ máy chủ.');
+        throw new Error('Không nhận được mã xác thực (token) từ máy chủ.');
       }
 
       localStorage.setItem('token', token);
-      if (userData) {
-        localStorage.setItem('user', JSON.stringify(userData));
-      }
+      localStorage.setItem('user', JSON.stringify(userData));
 
       if (onLoginSuccess) {
         onLoginSuccess(token);
