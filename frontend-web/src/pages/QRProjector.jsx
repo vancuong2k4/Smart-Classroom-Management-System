@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { QrCode, Play, Square, RefreshCw, Clock, ShieldCheck, Users, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { QrCode, Play, Square, RefreshCw, Clock, ShieldCheck, Users, CheckCircle, AlertCircle, Loader2, MapPin } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { io } from 'socket.io-client';
 import axiosClient from '../api/axiosClient';
@@ -17,12 +17,69 @@ function QRProjector() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const [classLatitude, setClassLatitude] = useState('');
-  const [classLongitude, setClassLongitude] = useState('');
-  const [allowedNetwork, setAllowedNetwork] = useState('');
+  // Tọa độ GPS tự động từ trình duyệt & Bán kính điểm danh
+  const [coords, setCoords] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
   const [radiusMeters, setRadiusMeters] = useState('50');
 
   const socketRef = useRef(null);
+
+  // Lấy vị trí GPS hiện tại từ Geolocation API của trình duyệt
+  const fetchBrowserLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError('Trình duyệt không hỗ trợ Geolocation (định vị GPS).');
+      return;
+    }
+
+    setLocating(true);
+    setLocationError('');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = Number(position.coords.latitude.toFixed(6));
+        const lng = Number(position.coords.longitude.toFixed(6));
+        const acc = Math.round(position.coords.accuracy || 0);
+        setCoords({ latitude: lat, longitude: lng, accuracy: acc });
+        setLocating(false);
+        setLocationError('');
+      },
+      (err) => {
+        let msg = 'Không thể lấy vị trí hiện tại.';
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            msg = 'Trình duyệt bị từ chối quyền truy cập Vị trí. Vui lòng cho phép quyền Vị trí (Location) trong cài đặt trình duyệt để mở phiên điểm danh!';
+            break;
+          case err.POSITION_UNAVAILABLE:
+            msg = 'Tín hiệu GPS/Vị trí không khả dụng. Vui lòng kiểm tra lại thiết bị hoặc kết nối.';
+            break;
+          case err.TIMEOUT:
+            msg = 'Thời gian lấy tọa độ vị trí đã quá hạn. Vui lòng thử lại!';
+            break;
+          default:
+            msg = err.message || msg;
+        }
+        setLocationError(msg);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, []);
+
+  // Tự động lấy vị trí khi component mount
+  useEffect(() => {
+    let isMounted = true;
+    const initLocation = async () => {
+      await Promise.resolve();
+      if (isMounted) {
+        fetchBrowserLocation();
+      }
+    };
+    initLocation();
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchBrowserLocation]);
 
   // 1. Tải danh sách lớp học thật của giảng viên từ Database khi mở trang
   useEffect(() => {
@@ -108,32 +165,51 @@ function QRProjector() {
     setScannedStudents([]);
 
     try {
+      // 1. Xác định tọa độ GPS hiện tại của giảng viên
+      let currentLat = coords?.latitude;
+      let currentLng = coords?.longitude;
+
+      if (currentLat === undefined || currentLng === undefined || currentLat === null || currentLng === null) {
+        setErrorMessage('Đang tự động xác định vị trí GPS từ trình duyệt...');
+        try {
+          const pos = await new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+              reject(new Error('Trình duyệt không hỗ trợ Geolocation'));
+              return;
+            }
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
+            });
+          });
+          currentLat = Number(pos.coords.latitude.toFixed(6));
+          currentLng = Number(pos.coords.longitude.toFixed(6));
+          setCoords({
+            latitude: currentLat,
+            longitude: currentLng,
+            accuracy: Math.round(pos.coords.accuracy || 0),
+          });
+          setLocationError('');
+        } catch (geoErr) {
+          const errMsg =
+            geoErr.code === 1
+              ? 'Trình duyệt bị từ chối quyền truy cập Vị trí. Vui lòng cho phép quyền Vị trí (Location) trong cài đặt trình duyệt để mở phiên điểm danh!'
+              : 'Không thể xác định vị trí GPS hiện tại. Vui lòng bật định vị trên máy và bấm "Cập nhật lại GPS".';
+          setErrorMessage(errMsg);
+          setLocationError(errMsg);
+          setLoading(false);
+          return;
+        }
+      }
+
       const payload = {
         durationMinutes: selectedDuration,
         duration_minutes: selectedDuration,
+        latitude: currentLat,
+        longitude: currentLng,
+        radius_meters: Number(radiusMeters) || 50,
       };
-
-      if (classLatitude.trim() && classLongitude.trim()) {
-        const latitude = Number(classLatitude);
-        const longitude = Number(classLongitude);
-        if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
-            !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-          throw new Error('Vui lòng nhập tọa độ lớp hợp lệ.');
-        }
-        payload.latitude = latitude;
-        payload.longitude = longitude;
-      }
-
-      if (radiusMeters.trim()) {
-        const radius = Number(radiusMeters);
-        if (Number.isFinite(radius) && radius >= 10 && radius <= 1000) {
-          payload.radius_meters = radius;
-        }
-      }
-
-      if (allowedNetwork.trim()) {
-        payload.ip_range = allowedNetwork.trim();
-      }
 
       // 2. Gọi API POST /courses/${courseId}/sessions kèm durationMinutes
       const response = await axiosClient.post(`/courses/${selectedClass}/sessions`, payload);
@@ -142,7 +218,7 @@ function QRProjector() {
       const sessionId = session?.id;
 
       if (!sessionId) {
-        throw new Error('Không nhận được mã phiên (sessionId) từ máy chủ.');
+        throw new Error('Không nhận được thông tin phiên điểm danh từ hệ thống.');
       }
 
       setCurrentSession(session);
@@ -221,7 +297,7 @@ function QRProjector() {
           Máy chiếu QR Điểm danh Trực tiếp
         </h1>
         <p style={{ fontSize: '13px', color: '#7589a3', margin: 0 }}>
-          Kết nối Backend Socket.io Realtime, tự động đổi mã QR mỗi 10 giây và cập nhật tức thì danh sách sinh viên quét mã.
+          Tạo mã QR động để sinh viên quét điểm danh trực tiếp tại lớp.
         </p>
       </div>
 
@@ -269,30 +345,97 @@ function QRProjector() {
               </select>
             </div>
 
-            <fieldset disabled={isSessionActive || loading}
-              style={{ border: '1px solid #e1e4e8', borderRadius: '12px', padding: '14px', margin: 0 }}>
-              <legend style={{ color: '#081c36', fontWeight: 600, fontSize: '13px' }}>
-                Vị trí và phạm vi lớp học (Tùy chọn)
-              </legend>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                {[
-                  ['Vĩ độ', classLatitude, setClassLatitude, 'Ví dụ: 10.123456'],
-                  ['Kinh độ', classLongitude, setClassLongitude, 'Ví dụ: 106.123456'],
-                  ['Mạng IP được phép (CIDR)', allowedNetwork, setAllowedNetwork, 'Ví dụ: 192.168.1.0/24'],
-                  ['Bán kính (mét)', radiusMeters, setRadiusMeters, '50'],
-                ].map(([label, value, setter, placeholder]) => (
-                  <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#081c36' }}>
-                    {label}
-                    <input value={value} onChange={(event) => setter(event.target.value)}
-                      placeholder={placeholder}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: '8px', border: '1px solid #e1e4e8', background: '#f5f7fb' }} />
-                  </label>
-                ))}
+            {/* Cấu hình Vị trí GPS Tự động & Bán kính */}
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e1e4e8', borderRadius: '12px', padding: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: '#081c36', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <MapPin size={16} color="#0068ff" /> Vị trí phòng học (GPS tự động)
+                </span>
+                <button
+                  type="button"
+                  onClick={fetchBrowserLocation}
+                  disabled={locating || isSessionActive}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#0068ff',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: locating || isSessionActive ? 'not-allowed' : 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <RefreshCw size={12} className={locating ? 'animate-spin' : ''} />
+                  {locating ? 'Đang định vị...' : 'Cập nhật lại GPS'}
+                </button>
               </div>
-              <p style={{ fontSize: '12px', color: '#7589a3', marginBottom: 0, marginTop: '8px' }}>
-                Để trống nếu muốn sử dụng tọa độ và dải mạng mặc định của trường.
-              </p>
-            </fieldset>
+
+              {/* Trạng thái định vị */}
+              {locating ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', backgroundColor: '#eff6ff', borderRadius: '8px', color: '#1d4ed8', fontSize: '12px' }}>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Đang tự động lấy tọa độ GPS từ trình duyệt...</span>
+                </div>
+              ) : locationError ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '12px' }}>
+                  <AlertCircle size={16} className="shrink-0" />
+                  <span>{locationError}</span>
+                </div>
+              ) : coords ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#16a34a', fontSize: '12px' }}>
+                  <div>
+                    <span style={{ fontWeight: '600', display: 'block' }}>
+                      Vĩ độ: {coords.latitude} • Kinh độ: {coords.longitude}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#15803d' }}>
+                      ✓ Độ chính xác thiết bị: ±{coords.accuracy}m
+                    </span>
+                  </div>
+                  <CheckCircle size={16} />
+                </div>
+              ) : (
+                <div style={{ padding: '8px 12px', backgroundColor: '#f1f5f9', borderRadius: '8px', color: '#64748b', fontSize: '12px' }}>
+                  Chưa xác định được vị trí. Nhấn "Cập nhật lại GPS" để cấp quyền.
+                </div>
+              )}
+
+              {/* Chọn Bán kính cho phép */}
+              <div style={{ marginTop: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                  Bán kính điểm danh cho phép (Radius)
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  {[
+                    { label: '50m', val: '50' },
+                    { label: '100m', val: '100' },
+                    { label: '150m', val: '150' },
+                    { label: '200m', val: '200' },
+                  ].map((r) => (
+                    <button
+                      key={r.val}
+                      type="button"
+                      disabled={isSessionActive}
+                      onClick={() => setRadiusMeters(r.val)}
+                      style={{
+                        padding: '6px 0',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        border: radiusMeters === r.val ? '2px solid #0068ff' : '1px solid #cbd5e1',
+                        backgroundColor: radiusMeters === r.val ? '#eff6ff' : '#ffffff',
+                        color: radiusMeters === r.val ? '#0068ff' : '#334155',
+                        cursor: isSessionActive ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#081c36', marginBottom: '8px' }}>
@@ -381,7 +524,7 @@ function QRProjector() {
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', marginBottom: '16px' }}>
                 <ShieldCheck size={14} />
-                Phiên chiếu Socket.io đang hoạt động (ID: {currentSession?.id})
+                Phiên điểm danh đang hoạt động (Mã phiên: #{currentSession?.id})
               </div>
 
               <div style={{ padding: '16px', backgroundColor: '#ffffff', border: '3px solid #0068ff', borderRadius: '20px', boxShadow: '0 8px 24px rgba(0,104,255,0.15)', marginBottom: '16px' }}>
@@ -390,7 +533,7 @@ function QRProjector() {
                 ) : (
                   <div style={{ width: '220px', height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#0068ff' }}>
                     <Loader2 size={32} className="animate-spin" />
-                    <span style={{ fontSize: '12px', color: '#7589a3' }}>Đang nhận mã QR từ Socket...</span>
+                    <span style={{ fontSize: '12px', color: '#7589a3' }}>Đang tải mã QR...</span>
                   </div>
                 )}
               </div>
@@ -406,7 +549,7 @@ function QRProjector() {
                 </div>
               </div>
               <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>
-                Mã QR được cấp phát tự động từ Redis và Socket.io của Backend.
+                Mã QR tự động làm mới định kỳ để bảo đảm tính chính xác khi điểm danh.
               </p>
             </div>
           ) : (
@@ -416,14 +559,14 @@ function QRProjector() {
               </div>
               <p style={{ fontSize: '15px', fontWeight: '600', color: '#081c36', margin: '0 0 4px 0' }}>Sẵn sàng chiếu màn hình</p>
               <p style={{ fontSize: '12px', color: '#7589a3', margin: 0, maxWidth: '280px' }}>
-                Mã QR bảo mật thật từ máy chủ sẽ hiển thị ngay khi bạn nhấn "Mở phiên điểm danh ngay".
+                Mã QR điểm danh sẽ hiển thị ngay khi bạn nhấn "Mở phiên điểm danh ngay".
               </p>
             </>
           )}
         </div>
       </div>
 
-      {/* Bảng Danh Sách Sinh Viên Vừa Quét Realtime (attendance_scanned) */}
+      {/* Bảng Danh Sách Sinh Viên Vừa Quét Realtime */}
       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e1e4e8', paddingBottom: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -432,9 +575,9 @@ function QRProjector() {
             </div>
             <div>
               <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#081c36', margin: 0 }}>
-                Sinh viên vừa quét thành công (Realtime)
+                Sinh viên vừa quét thành công
               </h3>
-              <p style={{ fontSize: '12px', color: '#7589a3', margin: 0 }}>Cập nhật tức thời qua sự kiện Socket.io `attendance_scanned`</p>
+              <p style={{ fontSize: '12px', color: '#7589a3', margin: 0 }}>Danh sách sinh viên có mặt được cập nhật theo thời gian thực</p>
             </div>
           </div>
           <span style={{ fontSize: '12px', fontWeight: '600', color: '#0068ff', backgroundColor: '#e5efff', padding: '4px 12px', borderRadius: '20px' }}>
@@ -445,8 +588,8 @@ function QRProjector() {
         {scannedStudents.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px 16px', color: '#7589a3', fontSize: '13px' }}>
             {isSessionActive
-              ? 'Đang chờ sinh viên quét mã... Danh sách sinh viên sẽ nhảy theo thời gian thực tại đây.'
-              : 'Chưa có lượt quét nào. Hãy mở phiên để bắt đầu nhận dữ liệu điểm danh realtime.'}
+              ? 'Đang chờ sinh viên quét mã... Danh sách sinh viên sẽ hiển thị theo thời gian thực tại đây.'
+              : 'Chưa có lượt quét nào. Hãy mở phiên để bắt đầu nhận dữ liệu điểm danh trực tiếp.'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>

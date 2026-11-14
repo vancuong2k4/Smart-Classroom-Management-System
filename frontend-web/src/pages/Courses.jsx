@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
@@ -10,7 +11,8 @@ import {
   Loader2, 
   AlertCircle,
   GraduationCap,
-  UserCheck 
+  UserCheck,
+  ClipboardList
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
@@ -499,9 +501,31 @@ function Courses() {
                   </span>
                 )}
               </div>
-              <p style={{ fontSize: '12px', color: '#7589a3', margin: '4px 0 0 0' }}>
-                Mã lớp: <strong>{selectedCourse.code}</strong> • Giảng viên: <strong>{selectedCourse.lecturer_username || 'Chưa phân công'}</strong>
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+                <p style={{ fontSize: '12px', color: '#7589a3', margin: 0 }}>
+                  Mã lớp: <strong>{selectedCourse.code}</strong> • Giảng viên: <strong>{selectedCourse.lecturer_username || 'Chưa phân công'}</strong>
+                </p>
+                <Link
+                  to={`/leave-requests?courseId=${selectedCourse.id}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    backgroundColor: '#eff6ff',
+                    color: '#0068ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '8px',
+                    padding: '3px 8px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title="Xem và duyệt đơn nghỉ phép của lớp này"
+                >
+                  <ClipboardList size={13} /> Đơn nghỉ phép lớp này
+                </Link>
+              </div>
             </div>
 
             {/* Form Thêm Sinh viên bằng MSSV/Username */}

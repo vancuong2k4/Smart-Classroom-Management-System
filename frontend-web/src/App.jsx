@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import Courses from './pages/Courses';
 import QRProjector from './pages/QRProjector';
 import Statistics from './pages/Statistics';
+import Users from './pages/Users';
+import LeaveRequests from './pages/LeaveRequests';
 
 // Component Bảo vệ Tuyến đường (Chặn người dùng chưa đăng nhập)
 function ProtectedRoute({ token, children }) {
@@ -23,6 +25,25 @@ function ProtectedRoute({ token, children }) {
 // Component Chặn truy cập trang Login nếu đã đăng nhập có Token
 function PublicOnlyRoute({ token, children }) {
   if (token) {
+    return <Navigate to="/courses" replace />;
+  }
+
+  return children;
+}
+
+// Component Bảo vệ Tuyến đường chỉ dành cho Quản trị viên (ADMIN)
+function AdminRoute({ children }) {
+  let user = null;
+  try {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      user = JSON.parse(storedUser);
+    }
+  } catch {
+    // Không làm gì nếu parse thất bại
+  }
+
+  if (user?.role !== 'ADMIN') {
     return <Navigate to="/courses" replace />;
   }
 
@@ -86,6 +107,15 @@ function App() {
           <Route path="projector" element={<QRProjector />} />
           <Route path="statistics" element={<Statistics />} />
           <Route path="reports" element={<Statistics />} />
+          <Route path="leave-requests" element={<LeaveRequests />} />
+          <Route
+            path="users"
+            element={
+              <AdminRoute>
+                <Users />
+              </AdminRoute>
+            }
+          />
         </Route>
 
         {/* Bắt mọi đường dẫn không hợp lệ chuyển về trang chính */}

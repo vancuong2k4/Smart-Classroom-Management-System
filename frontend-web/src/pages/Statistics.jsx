@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, RefreshCw, Filter, CheckCircle2, Clock, XCircle, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
+import { 
+  Download, 
+  RefreshCw, 
+  Filter, 
+  CheckCircle2, 
+  Clock, 
+  XCircle, 
+  FileSpreadsheet, 
+  Loader2, 
+  AlertCircle,
+  ShieldAlert,
+  CheckSquare,
+  Users
+} from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
 function Statistics() {
@@ -84,9 +97,10 @@ function Statistics() {
   };
 
   // Tính Tỷ lệ Chuyên cần (%)
-  const calculateRate = (present, late, total) => {
-    if (!total || total === 0) return '0%';
-    const rate = (((present + late * 0.5) / total) * 100).toFixed(1);
+  const calculateRate = (present, late, excused, heldCount) => {
+    if (!heldCount || heldCount === 0) return '100%';
+    const effectivePresent = present + late * 0.5 + excused;
+    const rate = Math.min(100, (effectivePresent / heldCount) * 100).toFixed(1);
     return `${rate}%`;
   };
 
@@ -96,11 +110,14 @@ function Statistics() {
     ? `/api/reports/courses/${selectedClass}/export?token=${encodeURIComponent(token)}`
     : '#';
 
-  // Tổng số buổi học của lớp
-  const totalSessions = reportData.length > 0 ? (reportData[0].total_sessions ?? 0) : 0;
+  // Thống kê các chỉ số từ dữ liệu trả về của API Backend
+  const totalHeldSessions = reportData.length > 0 ? (reportData[0].held_sessions ?? 0) : 0;
+  const totalCourseSessions = reportData.length > 0 ? (reportData[0].total_sessions ?? 15) : 15;
+  const maxAllowedAbsences = reportData.length > 0 ? (reportData[0].max_absences ?? 2) : 2;
+  const bannedStudentsCount = reportData.filter((r) => r.is_banned).length;
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1280px', margin: '0 auto' }}>
+    <div style={{ padding: '24px', maxWidth: '1320px', margin: '0 auto' }}>
       {/* Header & Nút Thao Tác */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
@@ -108,7 +125,7 @@ function Statistics() {
             Thống kê & Báo cáo Chuyên cần
           </h1>
           <p style={{ fontSize: '13px', color: '#7589a3', margin: 0 }}>
-            Dữ liệu tổng hợp tỷ lệ chuyên cần từ cơ sở dữ liệu và tải báo cáo định dạng CSV/Excel.
+            Dữ liệu tổng hợp tỷ lệ chuyên cần, cảnh báo cấm thi tự động và xuất báo cáo CSV theo quy chế học vụ.
           </p>
         </div>
 
@@ -159,7 +176,7 @@ function Statistics() {
       )}
 
       {/* Lọc theo lớp học phần */}
-      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '16px', padding: '16px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '16px', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <Filter size={18} style={{ color: '#7589a3' }} />
         <span style={{ fontSize: '13px', fontWeight: '500', color: '#081c36' }}>Chọn lớp học phần:</span>
         <select 
@@ -179,22 +196,65 @@ function Statistics() {
         </select>
       </div>
 
+      {/* Thẻ thống kê nhanh các chỉ số học phần */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: '#e5efff', color: '#0068ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Users size={22} />
+          </div>
+          <div>
+            <span style={{ fontSize: '11px', color: '#7589a3', fontWeight: '500', textTransform: 'uppercase' }}>Sĩ số sinh viên</span>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#081c36', margin: 0 }}>{reportData.length} SV</h3>
+          </div>
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FileSpreadsheet size={22} />
+          </div>
+          <div>
+            <span style={{ fontSize: '11px', color: '#7589a3', fontWeight: '500', textTransform: 'uppercase' }}>Tiến độ học phần</span>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#081c36', margin: 0 }}>{totalHeldSessions} / {totalCourseSessions} buổi</h3>
+          </div>
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #fed7aa', borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: '#fff7ed', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Clock size={22} />
+          </div>
+          <div>
+            <span style={{ fontSize: '11px', color: '#ea580c', fontWeight: '600', textTransform: 'uppercase' }}>Vắng tối đa cho phép</span>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#ea580c', margin: 0 }}>{maxAllowedAbsences} buổi</h3>
+          </div>
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #fecaca', borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ShieldAlert size={22} />
+          </div>
+          <div>
+            <span style={{ fontSize: '11px', color: '#dc2626', fontWeight: '600', textTransform: 'uppercase' }}>Sinh viên CẤM THI</span>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#dc2626', margin: 0 }}>{bannedStudentsCount} SV</h3>
+          </div>
+        </div>
+      </div>
+
       {/* Bảng Chi tiết Thống kê Điểm danh */}
       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <FileSpreadsheet size={22} style={{ color: '#0068ff' }} />
-            <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#081c36', margin: 0 }}>Danh sách Tổng hợp Chuyên cần</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#081c36', margin: 0 }}>Danh sách Tổng hợp Chuyên cần & Điều kiện Thi</h3>
           </div>
           <span style={{ fontSize: '12px', color: '#7589a3' }}>
-            Tổng số buổi đã điểm danh: <strong>{totalSessions} buổi</strong>
+            Đã diễn ra: <strong>{totalHeldSessions} / {totalCourseSessions} buổi</strong> (Cho phép vắng tối đa: {maxAllowedAbsences} buổi)
           </span>
         </div>
 
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '48px 0', color: '#0068ff', gap: '10px' }}>
             <Loader2 size={24} className="animate-spin" />
-            <span style={{ fontSize: '14px', color: '#7589a3' }}>Đang tải báo cáo từ máy chủ...</span>
+            <span style={{ fontSize: '14px', color: '#7589a3' }}>Đang tải dữ liệu báo cáo...</span>
           </div>
         ) : reportData.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '48px 16px', color: '#7589a3', fontSize: '13px' }}>
@@ -205,60 +265,119 @@ function Statistics() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f5f7fb', borderBottom: '1px solid #e1e4e8', color: '#081c36', fontWeight: '600' }}>
-                  <th style={{ padding: '12px 16px' }}>STT</th>
-                  <th style={{ padding: '12px 16px' }}>Mã Sinh Viên (Username)</th>
-                  <th style={{ padding: '12px 16px' }}>Họ và Tên</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>
+                  <th style={{ padding: '12px 14px' }}>STT</th>
+                  <th style={{ padding: '12px 14px' }}>MSSV / Username</th>
+                  <th style={{ padding: '12px 14px' }}>Họ và Tên</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'center' }}>
                     <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                       <CheckCircle2 size={14} /> Có mặt
                     </span>
                   </th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>
+                  <th style={{ padding: '12px 14px', textAlign: 'center' }}>
                     <span style={{ color: '#d97706', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                       <Clock size={14} /> Đi muộn
                     </span>
                   </th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    <span style={{ color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <XCircle size={14} /> Vắng mặt
+                  <th style={{ padding: '12px 14px', textAlign: 'center' }}>
+                    <span style={{ color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckSquare size={14} /> Có phép
                     </span>
                   </th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Lỗi vị trí (Gian lận)</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Tỷ lệ Chuyên cần</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'center' }}>
+                    <span style={{ color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <XCircle size={14} /> Vắng K.Phép
+                    </span>
+                  </th>
+                  <th style={{ padding: '12px 14px', textAlign: 'center' }}>Lỗi vị trí</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'center' }}>Tỷ lệ Chuyên cần</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'center', minWidth: '130px' }}>Trạng thái dự thi</th>
                 </tr>
               </thead>
               <tbody>
                 {reportData.map((row, idx) => {
                   const present = row.present_count ?? row.present ?? 0;
                   const late = row.late_count ?? row.late ?? 0;
+                  const excused = row.excused_count ?? 0;
                   const absent = row.absent_count ?? row.absent ?? 0;
                   const invalid = row.invalid_count ?? 0;
-                  const total = row.total_sessions ?? row.total ?? 0;
                   const username = row.username || row.mssv;
+                  const isBanned = Boolean(row.is_banned);
 
                   return (
-                    <tr key={row.student_id || username || idx} style={{ borderBottom: '1px solid #f0f2f5' }}>
-                      <td style={{ padding: '12px 16px', color: '#7589a3' }}>{idx + 1}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: '600', color: '#0068ff' }}>{username}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: '500', color: '#081c36' }}>
+                    <tr 
+                      key={row.student_id || username || idx} 
+                      style={{ 
+                        borderBottom: '1px solid #f0f2f5',
+                        backgroundColor: isBanned ? '#fff5f5' : 'transparent',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                    >
+                      <td style={{ padding: '12px 14px', color: '#7589a3' }}>{idx + 1}</td>
+                      <td style={{ padding: '12px 14px', fontWeight: '600', color: '#0068ff' }}>{username}</td>
+                      <td style={{ padding: '12px 14px', fontWeight: '500', color: '#081c36' }}>
                         {row.fullName || row.full_name || `Sinh viên ${username}`}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', color: '#059669' }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: '#059669' }}>
                         {present}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', color: '#d97706' }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: '#d97706' }}>
                         {late}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', color: '#dc2626' }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: '#2563eb' }}>
+                        {excused}
+                      </td>
+                      <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: absent > 0 ? '#dc2626' : '#64748b' }}>
                         {absent}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', color: invalid > 0 ? '#dc2626' : '#7589a3' }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: invalid > 0 ? '#dc2626' : '#7589a3' }}>
                         {invalid}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <span style={{ backgroundColor: '#e5efff', color: '#0068ff', padding: '4px 10px', borderRadius: '12px', fontWeight: '700', fontSize: '12px' }}>
-                          {calculateRate(present, late, total)}
+                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <span style={{ backgroundColor: '#e5efff', color: '#0068ff', padding: '3px 8px', borderRadius: '10px', fontWeight: '700', fontSize: '11px' }}>
+                          {calculateRate(present, late, excused, totalHeldSessions)}
                         </span>
+                      </td>
+
+                      {/* Trạng thái dự thi: Badge CẤM THI màu đỏ nếu is_banned === true */}
+                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        {isBanned ? (
+                          <span 
+                            style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              backgroundColor: '#fef2f2', 
+                              color: '#dc2626', 
+                              border: '1.5px solid #ef4444', 
+                              padding: '4px 10px', 
+                              borderRadius: '12px', 
+                              fontWeight: '800', 
+                              fontSize: '11px',
+                              boxShadow: '0 1px 4px rgba(220, 38, 38, 0.2)',
+                              letterSpacing: '0.5px'
+                            }}
+                            title={`Vắng không phép (${absent} buổi) vượt quá mức cho phép (${maxAllowedAbsences} buổi)!`}
+                          >
+                            <ShieldAlert size={13} /> CẤM THI
+                          </span>
+                        ) : (
+                          <span 
+                            style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              backgroundColor: '#f0fdf4', 
+                              color: '#16a34a', 
+                              border: '1px solid #bbf7d0', 
+                              padding: '3px 8px', 
+                              borderRadius: '12px', 
+                              fontWeight: '600', 
+                              fontSize: '11px' 
+                            }}
+                          >
+                            <CheckCircle2 size={13} /> Đủ điều kiện
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
