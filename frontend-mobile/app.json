@@ -38,7 +38,8 @@
         {
           "locationWhenInUsePermission": "Cho phép Smart Classroom sử dụng vị trí khi điểm danh để xác nhận bạn đang ở trong lớp."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

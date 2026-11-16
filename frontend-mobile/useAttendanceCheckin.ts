@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Location from 'expo-location';
+import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 
@@ -10,13 +11,33 @@ export type CheckinState = {
   status?: 'PRESENT' | 'LATE';
   settings?: boolean;
   uncertain?: boolean;
+  deviceMismatch?: boolean;
 };
 
 const initial: CheckinState = { phase: 'idle', message: '' };
 
 class CheckinError extends Error {
-  constructor(message: string, public settings = false) {
+  constructor(message: string, public settings = false, public deviceMismatch = false) {
     super(message);
+  }
+}
+
+async function getDeviceId(): Promise<string> {
+  try {
+    const value = Platform.OS === 'android'
+      ? Application.getAndroidId()
+      : Platform.OS === 'ios'
+        ? await Application.getIosIdForVendorAsync()
+        : null;
+
+    if (!value?.trim()) {
+      throw new Error('Device ID unavailable');
+    }
+    return value.trim();
+  } catch {
+    throw new CheckinError(
+      'Không lấy được mã định danh thiết bị. Vui lòng mở lại ứng dụng và thử lại.'
+    );
   }
 }
 
@@ -100,6 +121,9 @@ export function useAttendanceCheckin(apiUrl: string, focused: boolean) {
         throw new CheckinError('Hãy quay lại ứng dụng và quét mã mới để điểm danh.');
       }
 
+      const deviceId = await getDeviceId();
+      if (!current()) return;
+
       setState({ phase: 'sending', message: 'Đang gửi yêu cầu điểm danh…' });
       const abort = new AbortController();
       controller.current = abort;
@@ -116,22 +140,34 @@ export function useAttendanceCheckin(apiUrl: string, focused: boolean) {
           token: qrToken.trim(),
           latitude,
           longitude,
+          deviceId,
         }),
         signal: abort.signal,
       });
-      const body = await response.json();
+      let body: any = null;
+      try {
+        body = await response.json();
+      } catch {
+        // Vẫn xử lý được HTTP 403 nếu server không gửi JSON.
+      }
       if (!current()) return;
 
       if (!response.ok) {
         serverRejected = response.status < 500;
-        const message = response.status === 401
-          ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng xuất và đăng nhập lại.'
+        const deviceMismatch =
+          response.status === 403 &&
+          (body?.code === 'DEVICE_MISMATCH' ||
+           body?.error?.code === 'DEVICE_MISMATCH');
+        const message = deviceMismatch
+          ? 'Tài khoản này đã được liên kết với một thiết bị khác. Vui lòng liên hệ Giảng viên hoặc Quản trị viên để đổi thiết bị!'
+          : response.status === 401
+            ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng xuất và đăng nhập lại.'
           : response.status === 429
             ? 'Bạn thao tác quá nhanh. Vui lòng đợi một lát rồi thử lại.'
             : typeof body?.message === 'string'
               ? body.message
               : 'Máy chủ chưa xử lý được yêu cầu điểm danh.';
-        throw new CheckinError(message);
+        throw new CheckinError(message, false, deviceMismatch);
       }
 
       const status = body?.data?.status;
@@ -161,6 +197,7 @@ export function useAttendanceCheckin(apiUrl: string, focused: boolean) {
             : 'Không lấy được vị trí. Kiểm tra quyền GPS và thử lại.',
         settings: err instanceof CheckinError && err.settings,
         uncertain,
+        deviceMismatch: err instanceof CheckinError && err.deviceMismatch,
       });
       void Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Error

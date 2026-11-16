@@ -4,7 +4,7 @@ import { useAttendanceCheckin } from './useAttendanceCheckin';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, AppState, Linking, Pressable,
-  ScrollView, StyleSheet, Text, View,
+  Modal, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
@@ -240,6 +240,7 @@ export default function QRScannerScreen() {
     const resultTitle = busy
       ? checkin.phase === 'location' ? 'Đang lấy vị trí' : 'Đang điểm danh'
       : success ? 'Điểm danh thành công'
+      : checkin.deviceMismatch ? 'Thiết bị không hợp lệ'
       : checkin.uncertain ? 'Chưa xác nhận kết quả' : 'Chưa thể điểm danh';
 
     return (
@@ -261,6 +262,45 @@ export default function QRScannerScreen() {
                 )}
               </View>
               <Text style={[s.title, { color }]}>{resultTitle}</Text>
+              {checkin.deviceMismatch && (
+                <Modal
+                  visible={true}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={reset}
+                  statusBarTranslucent
+                >
+                  <View style={s.deviceBackdrop}>
+                    <View style={s.deviceDialog}>
+                      <View style={s.deviceIcon}>
+                        <Ionicons
+                          name="lock-closed-outline"
+                          size={34}
+                          color="#B42318"
+                        />
+                      </View>
+                      <Text style={s.deviceTitle}>
+                        Thiết bị không hợp lệ
+                      </Text>
+                      <Text style={s.deviceMessage}>
+                        {checkin.message}
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={reset}
+                        style={({ pressed }) => [
+                          s.deviceButton,
+                          pressed && s.buttonPressed,
+                        ]}
+                      >
+                        <Text style={s.deviceButtonText}>
+                          Đã hiểu
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </Modal>
+              )}
               {success && (
                 <Text style={{
                   color, backgroundColor: tint, overflow: 'hidden',
@@ -446,6 +486,59 @@ const s = StyleSheet.create({
   buttonText: { color: 'white', fontSize: 16, fontWeight: '700' },
   note: { color: '#94A3B8', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 18 },
   errorText: { color: '#C2410C', textAlign: 'center', marginTop: 12 },
+  deviceBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: 'rgba(31,14,17,0.62)',
+  },
+  deviceDialog: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F5',
+    borderColor: '#E5484D',
+    borderWidth: 2,
+    borderRadius: 24,
+    padding: 24,
+  },
+  deviceIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 22,
+    backgroundColor: '#FEE4E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  deviceTitle: {
+    fontSize: 21,
+    fontWeight: '800',
+    textAlign: 'center',
+    color: '#B42318',
+  },
+  deviceMessage: {
+    fontSize: 15,
+    lineHeight: 23,
+    textAlign: 'center',
+    color: '#7A271A',
+    marginTop: 12,
+  },
+  deviceButton: {
+    backgroundColor: '#C62828',
+    marginTop: 24,
+    minHeight: 52,
+    borderRadius: 14,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deviceButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   footer: { flexDirection: 'row', gap: 7, justifyContent: 'center', paddingBottom: 8 },
   footerText: { color: '#94A3B8', fontSize: 12 },
   cameraScreen: { flex: 1, backgroundColor: '#101828' },
