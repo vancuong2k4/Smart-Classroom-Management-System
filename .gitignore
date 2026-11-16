@@ -10,3 +10,6 @@ coverage/
 
 # VS Code Local History extension (chứa bản sao file .env có mật khẩu!)
 .history/
+
+# Ignore local backup files
+*.bak
