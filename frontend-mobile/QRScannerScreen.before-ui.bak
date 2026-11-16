@@ -1,0 +1,92 @@
+import { useEffect, useRef, useState } from 'react';
+import { AppState, Button, Linking, Text, View } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useIsFocused } from '@react-navigation/native';
+
+export default function QRScannerScreen() {
+  const [permission, requestPermission] = useCameraPermissions();
+  const focused = useIsFocused();
+  const [active, setActive] = useState(AppState.currentState === 'active');
+  const [token, setToken] = useState('');
+  const [error, setError] = useState('');
+  const locked = useRef(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      setActive(state === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!focused) {
+      locked.current = false;
+      setToken('');
+      setError('');
+    }
+  }, [focused]);
+
+  if (!focused || !active) return <View style={{ flex: 1 }} />;
+
+  if (!permission) return <Text>Đang kiểm tra quyền camera…</Text>;
+
+  if (!permission.granted) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 20 }}>
+        <Text>Cho phép camera để quét mã QR điểm danh.</Text>
+        <Button
+          title={permission.canAskAgain ? 'Cho phép camera' : 'Mở cài đặt'}
+          onPress={() => {
+            if (permission.canAskAgain) {
+              requestPermission().catch(() => setError('Không xin được quyền camera.'));
+            } else {
+              Linking.openSettings().catch(() => setError('Không mở được cài đặt.'));
+            }
+          }}
+        />
+        {!!error && <Text>{error}</Text>}
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#101828' }}>
+      {!token && !error && (
+        <CameraView
+          style={{ flex: 1 }}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onMountError={() => setError('Không mở được camera. Hãy thử lại.')}
+          onBarcodeScanned={({ data }) => {
+            if (locked.current || !data.trim()) return;
+            locked.current = true;
+            setToken(data);
+          }}
+        />
+      )}
+      {!token && !error && (
+        <View pointerEvents="none" style={{
+          position: 'absolute', alignSelf: 'center', top: '25%',
+          width: '75%', aspectRatio: 1, borderWidth: 3,
+          borderColor: '#FFFFFF', borderRadius: 24,
+        }} />
+      )}
+      <View style={{ padding: 24, gap: 16 }}>
+        <Text style={{ color: 'white', textAlign: 'center' }}>
+          {error || (token ? 'Đã đọc mã QR. Chưa gửi điểm danh.' :
+            'Đưa mã QR của giảng viên vào khung ngắm.')}
+        </Text>
+        {!!token && (
+          <Text selectable style={{ color: 'white' }}>{token}</Text>
+        )}
+        {(!!token || !!error) && (
+          <Button title="Quét lại" onPress={() => {
+            setToken('');
+            setError('');
+            locked.current = false;
+          }} />
+        )}
+      </View>
+    </View>
+  );
+}
