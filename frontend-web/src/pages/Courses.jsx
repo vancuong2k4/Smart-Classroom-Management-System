@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
@@ -10,7 +11,8 @@ import {
   Loader2, 
   AlertCircle,
   GraduationCap,
-  UserCheck 
+  UserCheck,
+  ClipboardList
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
@@ -39,6 +41,8 @@ function Courses() {
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseCode, setNewCourseCode] = useState('');
   const [newCourseLecturerId, setNewCourseLecturerId] = useState('');
+  const [newCourseTotalSessions, setNewCourseTotalSessions] = useState('10');
+  const [newCourseMaxAbsences, setNewCourseMaxAbsences] = useState('2');
   const [submittingCourse, setSubmittingCourse] = useState(false);
   const [createCourseError, setCreateCourseError] = useState('');
 
@@ -168,6 +172,8 @@ function Courses() {
     const payload = {
       code,
       name,
+      totalSessions: Number(newCourseTotalSessions) || 10,
+      maxAbsences: Number(newCourseMaxAbsences) >= 0 ? Number(newCourseMaxAbsences) : 2,
     };
 
     if (isAdmin && newCourseLecturerId) {
@@ -183,6 +189,8 @@ function Courses() {
       setNewCourseName('');
       setNewCourseCode('');
       setNewCourseLecturerId('');
+      setNewCourseTotalSessions('10');
+      setNewCourseMaxAbsences('2');
       setShowAddCourseModal(false);
       await fetchCourses();
       if (createdCourse?.id) {
@@ -440,6 +448,11 @@ function Courses() {
                       </span>
                     )}
                   </div>
+
+                  {/* Tóm tắt quy chế buổi học & vắng tối đa */}
+                  <div style={{ fontSize: '11px', color: '#7589a3', marginTop: '6px', paddingLeft: '2px' }}>
+                    Kế hoạch: {course.total_sessions || course.totalSessions || 10} buổi • Vắng tối đa: {course.max_absences ?? course.maxAbsences ?? 2} buổi
+                  </div>
                 </div>
 
                 {/* Footer thẻ lớp: Sĩ số & Nút Phân công lại cho ADMIN */}
@@ -499,9 +512,31 @@ function Courses() {
                   </span>
                 )}
               </div>
-              <p style={{ fontSize: '12px', color: '#7589a3', margin: '4px 0 0 0' }}>
-                Mã lớp: <strong>{selectedCourse.code}</strong> • Giảng viên: <strong>{selectedCourse.lecturer_username || 'Chưa phân công'}</strong>
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+                <p style={{ fontSize: '12px', color: '#7589a3', margin: 0 }}>
+                  Mã lớp: <strong>{selectedCourse.code}</strong> • Giảng viên: <strong>{selectedCourse.lecturer_username || 'Chưa phân công'}</strong> • Quy mô: <strong>{selectedCourse.total_sessions ?? selectedCourse.totalSessions ?? 10} buổi</strong> (Vắng tối đa: <strong>{selectedCourse.max_absences ?? selectedCourse.maxAbsences ?? 2}</strong>)
+                </p>
+                <Link
+                  to={`/leave-requests?courseId=${selectedCourse.id}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    backgroundColor: '#eff6ff',
+                    color: '#0068ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '8px',
+                    padding: '3px 8px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title="Xem và duyệt đơn nghỉ phép của lớp này"
+                >
+                  <ClipboardList size={13} /> Đơn nghỉ phép lớp này
+                </Link>
+              </div>
             </div>
 
             {/* Form Thêm Sinh viên bằng MSSV/Username */}
@@ -575,7 +610,14 @@ function Courses() {
           <div style={{ backgroundColor: '#ffffff', border: '1px solid #e1e4e8', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#081c36', margin: 0 }}>Tạo Khóa Học Phần Mới</h3>
-              <button onClick={() => setShowAddCourseModal(false)} style={{ background: 'none', border: 'none', color: '#7589a3', cursor: 'pointer' }}>
+              <button
+                onClick={() => {
+                  setShowAddCourseModal(false);
+                  setNewCourseTotalSessions('10');
+                  setNewCourseMaxAbsences('2');
+                }}
+                style={{ background: 'none', border: 'none', color: '#7589a3', cursor: 'pointer' }}
+              >
                 <X size={20} />
               </button>
             </div>
@@ -612,6 +654,41 @@ function Courses() {
                 />
               </div>
 
+              {/* Cấu hình Tổng số buổi & Số buổi vắng tối đa cho phép */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#081c36', marginBottom: '4px' }}>
+                    Tổng số buổi học phần *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    placeholder="10 hoặc 15"
+                    value={newCourseTotalSessions}
+                    onChange={(e) => setNewCourseTotalSessions(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e1e4e8', backgroundColor: '#f5f7fb', fontSize: '13px', outline: 'none' }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#7589a3', marginTop: '2px', display: 'block' }}>Gợi ý: 10 hoặc 15 buổi</span>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#081c36', marginBottom: '4px' }}>
+                    Số buổi vắng tối đa cho phép *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    placeholder="2"
+                    value={newCourseMaxAbsences}
+                    onChange={(e) => setNewCourseMaxAbsences(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e1e4e8', backgroundColor: '#f5f7fb', fontSize: '13px', outline: 'none' }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#7589a3', marginTop: '2px', display: 'block' }}>Vượt quá sẽ bị cấm thi</span>
+                </div>
+              </div>
+
               {/* Dropdown Giảng viên phụ trách chỉ hiển thị nếu là ADMIN */}
               {isAdmin && (
                 <div>
@@ -636,7 +713,11 @@ function Courses() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowAddCourseModal(false)}
+                  onClick={() => {
+                    setShowAddCourseModal(false);
+                    setNewCourseTotalSessions('10');
+                    setNewCourseMaxAbsences('2');
+                  }}
                   style={{ backgroundColor: '#f5f7fb', color: '#081c36', border: '1px solid #e1e4e8', borderRadius: '10px', padding: '10px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
                 >
                   Hủy bỏ

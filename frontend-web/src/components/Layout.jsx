@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { BookOpen, QrCode, BarChart3, LogOut, GraduationCap, ShieldCheck } from 'lucide-react';
+import { BookOpen, QrCode, BarChart3, LogOut, GraduationCap, ShieldCheck, Users, ClipboardList } from 'lucide-react';
 
 function Layout({ onLogout }) {
   const navigate = useNavigate();
@@ -100,6 +100,33 @@ function Layout({ onLogout }) {
               </div>
             </NavLink>
 
+            {/* Menu "Quản lý người dùng": Chỉ hiển thị cho Admin */}
+            {isAdmin && (
+              <NavLink
+                to="/users"
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  textDecoration: 'none',
+                  backgroundColor: isActive ? '#0040a8' : 'transparent',
+                  boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                  transition: 'all 0.2s ease'
+                })}
+              >
+                <Users size={20} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Quản lý người dùng</span>
+                  <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Tài khoản, thiết bị & phân quyền</span>
+                </div>
+              </NavLink>
+            )}
+
             {/* Menu "Máy chiếu QR": Chỉ hiển thị cho Giảng viên, ẩn khi là Admin */}
             {!isAdmin && (
               <NavLink
@@ -123,6 +150,33 @@ function Layout({ onLogout }) {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span>Máy chiếu QR</span>
                   <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Điểm danh thời gian thực</span>
+                </div>
+              </NavLink>
+            )}
+
+            {/* Menu "Đơn xin nghỉ phép": Dành cho Giảng viên */}
+            {!isAdmin && (
+              <NavLink
+                to="/leave-requests"
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  textDecoration: 'none',
+                  backgroundColor: isActive ? '#0040a8' : 'transparent',
+                  boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                  transition: 'all 0.2s ease'
+                })}
+              >
+                <ClipboardList size={20} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Đơn xin nghỉ phép</span>
+                  <span style={{ fontSize: '10px', color: '#e0edff', fontWeight: 'normal' }}>Xét duyệt vắng có phép</span>
                 </div>
               </NavLink>
             )}

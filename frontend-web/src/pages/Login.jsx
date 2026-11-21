@@ -23,7 +23,7 @@ function Login({ onLoginSuccess }) {
       const userData = response.data?.user || response?.user || response.data?.data?.user;
 
       if (!token) {
-        throw new Error(response.data?.message || response?.message || 'Không nhận được mã xác thực (token) từ máy chủ.');
+        throw new Error(response.data?.message || response?.message || 'Không nhận được thông tin xác thực từ hệ thống.');
       }
 
       localStorage.setItem('token', token);

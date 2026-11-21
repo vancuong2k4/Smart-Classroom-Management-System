@@ -25,6 +25,7 @@ Mỗi Task sau khi hoàn thành sẽ có 1 file `README_TXXX.md` trong thư mụ
 | T017 | Kiểm thử tích hợp Web và ứng dụng điểm danh | Tích hợp / QA | ✅ Hoàn thành | [README_T017.md](./README_T017.md) |
 | T018 | Quản lý Tài khoản & Hoàn thiện Phân quyền Khóa học (Users & RBAC) | Backend | ✅ Hoàn thành | [README_T018.md](./README_T018.md) |
 | T019 | Quản trị Người Dùng, Device Binding, Đơn Nghỉ Phép & Cảnh Báo Cấm Thi | Backend | ✅ Hoàn thành | [README_T019.md](./README_T019.md) |
+| T020 | Giao diện Quản trị Người Dùng, Duyệt Đơn Nghỉ Phép, GPS QR & Cảnh Báo Cấm Thi | Frontend Web | ✅ Hoàn thành | [README_T020.md](./README_T020.md) |
 | T021 | Khóa Thiết Bị (Device Binding) & Đơn Xin Nghỉ Phép Trực Tuyến | Frontend Mobile | ✅ Hoàn thành | [README_T021.md](./README_T021.md) |
 
 ## Cấu trúc chuẩn của một file README_TXXX.md
