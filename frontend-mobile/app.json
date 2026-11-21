@@ -38,7 +38,14 @@
         {
           "locationWhenInUsePermission": "Cho phép Smart Classroom sử dụng vị trí khi điểm danh để xác nhận bạn đang ở trong lớp."
         }
-      ]
+      ],
+            [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép Smart Classroom truy cập thư viện ảnh để đính kèm minh chứng xin nghỉ phép."
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

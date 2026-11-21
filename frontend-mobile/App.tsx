@@ -1,5 +1,6 @@
 import { API_URL } from './apiConfig';
 import QRScannerScreen from './QRScannerScreen';
+import LeaveRequestsScreen from './LeaveRequestsScreen';
 import { useCallback, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
@@ -41,6 +42,7 @@ type Tabs = {
   Home: undefined;
   Scan: undefined;
   History: undefined;
+  Leave: undefined;
 };
 
 const Tab = createBottomTabNavigator<Tabs>();
@@ -302,6 +304,20 @@ function HomeScreen({
           <Ionicons name="chevron-forward" size={20} color="#98A2B3" />
         </Pressable>
 
+        <Pressable
+          onPress={() => navigation.navigate('Leave')}
+          style={({ pressed }) => [s.historyCard, pressed && s.pressed]}
+        >
+          <View style={s.smallIcon}>
+            <Ionicons name="document-text-outline" size={25} color={BLUE} />
+          </View>
+          <View style={s.flex}>
+            <Text style={s.actionTitle}>Gửi đơn xin nghỉ phép</Text>
+            <Text style={s.actionSubtitle}>Gửi đơn và xem lịch sử xét duyệt</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#98A2B3" />
+        </Pressable>
+
         <View style={s.tip}>
           <Ionicons name="information-circle-outline" size={21} color={BLUE} />
           <Text style={s.tipText}>
@@ -443,6 +459,7 @@ export default function App() {
                   Home: focused ? 'home' : 'home-outline',
                   Scan: 'qr-code-outline',
                   History: focused ? 'time' : 'time-outline',
+                  Leave: focused ? 'document-text' : 'document-text-outline',
                 };
 
                 return (
@@ -473,6 +490,11 @@ export default function App() {
               name="History"
               component={HistoryScreen}
               options={{ title: 'Lịch sử' }}
+            />
+            <Tab.Screen
+              name="Leave"
+              component={LeaveRequestsScreen}
+              options={{ title: 'Đơn nghỉ' }}
             />
           </Tab.Navigator>
         </NavigationContainer>
