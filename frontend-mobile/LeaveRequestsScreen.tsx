@@ -43,6 +43,8 @@ type LeaveRequest = {
   status: string;
   proofImageUrl?: string | null;
   proof_image_url?: string | null;
+  review_note?: string | null;
+  reviewNote?: string | null;
   createdAt?: string;
   created_at?: string;
 };
@@ -162,6 +164,12 @@ export default function LeaveRequestsScreen() {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) {
           Alert.alert('Cần quyền camera', 'Vui lòng cấp quyền camera để chụp ảnh minh chứng.');
+          return;
+        }
+      } else if (source === 'library') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Cần quyền thư viện ảnh', 'Vui lòng cấp quyền truy cập thư viện ảnh để chọn ảnh minh chứng.');
           return;
         }
       }
@@ -305,7 +313,7 @@ export default function LeaveRequestsScreen() {
                     </Text>
                     <Ionicons name={chooseCourse ? 'chevron-up' : 'chevron-down'} size={18} color={BLUE} />
                   </Pressable>
-                  {chooseCourse && <View style={s.courseList}>
+                  {chooseCourse && <ScrollView style={s.courseList} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
                     {courses.map(course => <Pressable
                       key={course.id}
                       style={s.courseItem}
@@ -313,7 +321,7 @@ export default function LeaveRequestsScreen() {
                       <Text style={s.courseName}>{course.name}</Text>
                       <Text style={s.muted}>{course.code}</Text>
                     </Pressable>)}
-                  </View>}
+                  </ScrollView>}
                 </>
               )}
 
@@ -399,6 +407,12 @@ export default function LeaveRequestsScreen() {
                   <View style={[s.status, { backgroundColor: info.background }]}>
                     <Text style={{ color: info.color, fontWeight: '700', fontSize: 12 }}>{info.label}</Text>
                   </View>
+                  {(request.review_note || request.reviewNote) && (
+                    <View style={{ backgroundColor: '#F8F9FC', padding: 10, borderRadius: 8, marginTop: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#475467' }}>Phản hồi từ Giảng viên:</Text>
+                      <Text style={{ fontSize: 13, color: '#1D2939', marginTop: 2 }}>{request.review_note || request.reviewNote}</Text>
+                    </View>
+                  )}
                 </View>;
               })}
             </View>

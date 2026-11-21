@@ -155,9 +155,12 @@ export function useAttendanceCheckin(apiUrl: string, focused: boolean) {
       if (!response.ok) {
         serverRejected = response.status < 500;
         const deviceMismatch =
-          response.status === 403 &&
-          (body?.code === 'DEVICE_MISMATCH' ||
-           body?.error?.code === 'DEVICE_MISMATCH');
+  response.status === 403 &&
+  (body?.code === 'DEVICE_MISMATCH' ||
+    body?.error?.code === 'DEVICE_MISMATCH' ||
+    (typeof body?.message === 'string' &&
+      /thiết bị/i.test(body.message)));
+
         const message = deviceMismatch
           ? 'Tài khoản này đã được liên kết với một thiết bị khác. Vui lòng liên hệ Giảng viên hoặc Quản trị viên để đổi thiết bị!'
           : response.status === 401
