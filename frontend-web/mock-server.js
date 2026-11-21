@@ -126,6 +126,8 @@ function createServer(port) {
             id: newId,
             code: body.code.trim().toUpperCase(),
             name: body.name.trim(),
+            total_sessions: body.totalSessions ? Number(body.totalSessions) : 10,
+            max_absences: body.maxAbsences !== undefined ? Number(body.maxAbsences) : 2,
             room: body.room?.trim() || 'Chưa xếp phòng',
             schedule: body.schedule?.trim() || 'Chưa xếp lịch',
             studentsCount: 0,
