@@ -448,6 +448,11 @@ function Courses() {
                       </span>
                     )}
                   </div>
+
+                  {/* Tóm tắt quy chế buổi học & vắng tối đa */}
+                  <div style={{ fontSize: '11px', color: '#7589a3', marginTop: '6px', paddingLeft: '2px' }}>
+                    Kế hoạch: {course.total_sessions || course.totalSessions || 10} buổi • Vắng tối đa: {course.max_absences ?? course.maxAbsences ?? 2} buổi
+                  </div>
                 </div>
 
                 {/* Footer thẻ lớp: Sĩ số & Nút Phân công lại cho ADMIN */}
