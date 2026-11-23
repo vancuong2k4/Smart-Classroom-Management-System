@@ -36,6 +36,7 @@ const BASE_SELECT = `
            s.start_time,
            s.end_time,
            s.closed_at,
+           s.session_number,
            ${STATUS_SQL}        AS status,
            s.created_at
     FROM sessions s
@@ -84,18 +85,18 @@ const lockCourse = async (courseId, db) => {
  */
 const create = async ({
     courseId, lecturerId, latitude, longitude, ipRange,
-    radiusMeters, lateAfterMinutes, durationMinutes,
+    radiusMeters, lateAfterMinutes, durationMinutes, sessionNumber,
 }, db = pool) => {
     const { rows } = await db.query(
         `INSERT INTO sessions
             (course_id, lecturer_id, location, ip_range,
-             radius_meters, late_after_minutes, start_time, end_time)
+             radius_meters, late_after_minutes, start_time, end_time, session_number)
          VALUES
             ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326), network($5::inet),
-             $6, $7, NOW(), NOW() + make_interval(mins => $8))
+             $6, $7, NOW(), NOW() + make_interval(mins => $8), $9)
          RETURNING id`,
         [courseId, lecturerId, longitude, latitude, ipRange,
-            radiusMeters, lateAfterMinutes, durationMinutes]
+            radiusMeters, lateAfterMinutes, durationMinutes, sessionNumber || 1]
     );
     return rows[0].id;
 };

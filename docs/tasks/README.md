@@ -27,6 +27,7 @@ Mỗi Task sau khi hoàn thành sẽ có 1 file `README_TXXX.md` trong thư mụ
 | T019 | Quản trị Người Dùng, Device Binding, Đơn Nghỉ Phép & Cảnh Báo Cấm Thi | Backend | ✅ Hoàn thành | [README_T019.md](./README_T019.md) |
 | T020 | Giao diện Quản trị Người Dùng, Duyệt Đơn Nghỉ Phép, GPS QR & Cảnh Báo Cấm Thi | Frontend Web | ✅ Hoàn thành | [README_T020.md](./README_T020.md) |
 | T021 | Khóa Thiết Bị (Device Binding) & Đơn Xin Nghỉ Phép Trực Tuyến | Frontend Mobile | ✅ Hoàn thành | [README_T021.md](./README_T021.md) |
+| T022 | Quản Lý Buổi Học (Session Numbering), Sổ Điểm Danh Chi Tiết & Đồng Bộ Nghỉ Phép | Fullstack | ✅ Hoàn thành | [README_T022.md](./README_T022.md) |
 
 ## Cấu trúc chuẩn của một file README_TXXX.md
 1. **Bảng thông tin** — Task ID, Stream, Epic, Người phụ trách, Trạng thái, Definition of Done

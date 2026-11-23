@@ -23,15 +23,17 @@ const attendanceModel = require('../models/attendance.model');
 const getById = async (req, res) => {
     const session = await sessionService.getSession(req.user, Number(req.params.sessionId));
     
-    // Nếu là giảng viên hoặc Admin, đính kèm lịch sử điểm danh của phiên
+    // Nếu là giảng viên hoặc Admin, đính kèm lịch sử điểm danh của phiên và danh sách 100% sinh viên lớp
     let attendance_records = undefined;
+    let full_roster = undefined;
     if (req.user.role === 'ADMIN' || req.user.role === 'LECTURER') {
         attendance_records = await attendanceModel.findBySession(session.id);
+        full_roster = await attendanceModel.getFullSessionRoster(session.id);
     }
     
     return sendSuccess(res, {
         message: 'Get session successfully',
-        data: { session, attendance_records }
+        data: { session, attendance_records, full_roster }
     });
 };
 

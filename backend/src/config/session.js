@@ -16,8 +16,8 @@ module.exports = Object.freeze({
     // => nếu không có ân hạn, SV trung thực bị từ chối oan.
     qrTokenGraceMs: toInt(process.env.QR_TOKEN_GRACE_SECONDS, 5) * 1000,
 
-    // Dải IP mặc định của trường (dùng khi GV không truyền ip_range lúc mở phiên)
-    defaultIpRange: process.env.SCHOOL_IP_RANGE || null,
+    // Dải IP mặc định của trường (dùng khi GV không truyền ip_range lúc mở phiên, fallback 0.0.0.0/0 cho môi trường dev)
+    defaultIpRange: process.env.SCHOOL_IP_RANGE || '0.0.0.0/0',
 
     // Giới hạn khi mở phiên
     defaultDurationMinutes: 15,

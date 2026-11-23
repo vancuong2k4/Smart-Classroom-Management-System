@@ -93,6 +93,9 @@ const checkin = async (user, { token, latitude, longitude, ipAddress, deviceId }
     return {
         status: finalStatus,
         distanceMeters: Math.round(context.distance_meters),
+        sessionNumber: context.session_number,
+        courseCode: context.course_code,
+        courseName: context.course_name,
         record
     };
 };

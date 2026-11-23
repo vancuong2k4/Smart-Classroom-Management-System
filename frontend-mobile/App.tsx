@@ -83,7 +83,8 @@ type Course = {
 };
 type Attendance = {
   course_id: number; course_code: string; course_name: string;
-  session_id: number; start_time: string; status: string;
+  session_id: number; session_number?: number; total_sessions?: number;
+  start_time: string; status: string;
   checked_in_at: string | null;
 };
 
@@ -139,11 +140,12 @@ function DataMessage({ loading, error, empty, onRetry }: {
   return <Text style={s.actionSubtitle}>{empty}</Text>;
 }
 
-const statusLabels: Record<string, { label: string; color: string }> = {
-  PRESENT: { label: 'Có mặt', color: '#15803D' },
-  LATE: { label: 'Đi muộn', color: '#A16207' },
-  ABSENT: { label: 'Vắng', color: '#B91C1C' },
-  INVALID_LOCATION: { label: 'Không hợp lệ vị trí', color: '#C2410C' },
+const statusLabels: Record<string, { label: string; color: string; bg: string }> = {
+  PRESENT: { label: 'Có mặt', color: '#15803D', bg: '#DCFCE7' },
+  LATE: { label: 'Đi muộn', color: '#A16207', bg: '#FEF9C3' },
+  EXCUSED: { label: 'Nghỉ có phép', color: '#2563EB', bg: '#EFF6FF' },
+  ABSENT: { label: 'Vắng', color: '#B91C1C', bg: '#FEE2E2' },
+  INVALID_LOCATION: { label: 'Không hợp lệ vị trí', color: '#C2410C', bg: '#FFEDD5' },
 };
 function dateLabel(value: string | null) {
   if (!value) return 'Chưa có thời gian';
@@ -176,13 +178,23 @@ function HistoryScreen() {
       </ScrollView>
       {loading || error || !visible.length ? <DataMessage loading={loading} error={error}
         empty="Chưa có lịch sử điểm danh." onRetry={refresh} /> : visible.map(item => {
-        const status = statusLabels[item.status] ?? { label: 'Chưa xác định', color: '#667085' };
+        const normalizedStatus = (item.status || '').trim().toUpperCase();
+        const status = statusLabels[normalizedStatus] ?? { label: 'Chưa xác định', color: '#667085', bg: '#F3F4F6' };
+        const buoiLabel = item.session_number
+          ? `Buổi ${item.session_number}${item.total_sessions ? ` / ${item.total_sessions}` : ''}`
+          : `Phiên #${item.session_id}`;
         return <View key={`${item.session_id}-${item.course_id}`} style={s.dataCard}>
           <Text style={s.actionTitle}>{item.course_name}</Text>
-          <Text style={s.actionSubtitle}>{item.course_code} · Phiên #{item.session_id}</Text>
-          <Text style={s.actionSubtitle}>Buổi học: {dateLabel(item.start_time)}</Text>
-          {item.checked_in_at && <Text style={s.actionSubtitle}>Điểm danh: {dateLabel(item.checked_in_at)}</Text>}
-          <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
+          <Text style={s.actionSubtitle}>{item.course_code} · {buoiLabel}</Text>
+          <Text style={s.actionSubtitle}>Thời gian: {dateLabel(item.start_time)}</Text>
+          {normalizedStatus === 'EXCUSED' ? (
+            item.checked_in_at && <Text style={s.actionSubtitle}>Duyệt phép lúc: {dateLabel(item.checked_in_at)}</Text>
+          ) : (
+            item.checked_in_at && <Text style={s.actionSubtitle}>Điểm danh lúc: {dateLabel(item.checked_in_at)}</Text>
+          )}
+          <View style={[s.badgePill, { backgroundColor: status.bg }]}>
+            <Text style={[s.badgePillText, { color: status.color }]}>{status.label}</Text>
+          </View>
         </View>;
       })}
     </ScrollView>
@@ -597,6 +609,17 @@ const s = StyleSheet.create({
   errorText: { color: '#B91C1C', fontSize: 14, lineHeight: 21 },
   retryText: { color: BLUE, fontWeight: '700', paddingVertical: 10 },
   statusText: { fontSize: 13, fontWeight: '700', marginTop: 8 },
+  badgePill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  badgePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   filter: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 20, backgroundColor: '#E8F0FF', marginRight: 8 },
   filterActive: { backgroundColor: BLUE },
   flex: { flex: 1 },

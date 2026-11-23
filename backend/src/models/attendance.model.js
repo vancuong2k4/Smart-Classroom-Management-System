@@ -11,6 +11,9 @@ const checkSessionContext = async (sessionId, lon, lat, ipAddress) => {
             SELECT
                 s.id,
                 s.course_id,
+                s.session_number,
+                c.code AS course_code,
+                c.name AS course_name,
                 s.start_time,
                 s.end_time,
                 s.closed_at,
@@ -24,6 +27,7 @@ const checkSessionContext = async (sessionId, lon, lat, ipAddress) => {
                     ELSE 'EXPIRED'
                 END AS session_status
             FROM sessions s
+            JOIN courses c ON c.id = s.course_id
             WHERE s.id = $4
         `, [lon, lat, ipAddress, sessionId]);
         return rows[0] || null;
@@ -68,6 +72,46 @@ const findBySession = async (sessionId) => {
         ORDER BY a.created_at DESC
     `, [sessionId]);
     return rows;
-}
+};
 
-module.exports = { checkSessionContext, upsertRecord, findBySession };
+/**
+ * Lấy danh sách 100% sĩ số lớp của phiên điểm danh,
+ * bao gồm cả sinh viên vắng mặt (ABSENT), có phép (EXCUSED), có mặt, muộn và lỗi vị trí.
+ */
+const getFullSessionRoster = async (sessionId) => {
+    const { rows } = await pool.query(`
+        SELECT
+            u.id AS student_id,
+            u.username,
+            u.full_name,
+            u.email,
+            a.id AS record_id,
+            COALESCE(a.status, 'ABSENT') AS status,
+            a.created_at AS scanned_at,
+            ST_Y(a.scanned_location) AS lat,
+            ST_X(a.scanned_location) AS lon,
+            a.scanned_ip::text AS ip_address,
+            CASE
+                WHEN a.scanned_location IS NOT NULL THEN
+                    ROUND(ST_DistanceSphere(s.location, a.scanned_location)::numeric, 0)::int
+                ELSE NULL
+            END AS distance_meters
+        FROM sessions s
+        JOIN enrollments e ON e.course_id = s.course_id
+        JOIN users u ON u.id = e.student_id
+        LEFT JOIN attendance_records a ON a.session_id = s.id AND a.student_id = u.id
+        WHERE s.id = $1
+        ORDER BY
+            CASE COALESCE(a.status, 'ABSENT')
+                WHEN 'PRESENT' THEN 1
+                WHEN 'LATE' THEN 2
+                WHEN 'EXCUSED' THEN 3
+                WHEN 'INVALID_LOCATION' THEN 4
+                ELSE 5
+            END,
+            u.username ASC;
+    `, [sessionId]);
+    return rows;
+};
+
+module.exports = { checkSessionContext, upsertRecord, findBySession, getFullSessionRoster };

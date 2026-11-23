@@ -8,20 +8,20 @@ const pool = require('../config/database');
 const getCourseReport = async (courseId) => {
     const query = `
         WITH course_sessions AS (
-            SELECT id FROM sessions WHERE course_id = $1
+            SELECT id, session_number FROM sessions WHERE course_id = $1
         ),
         session_count AS (
-            SELECT COUNT(*) AS total_sessions FROM course_sessions
+            SELECT COUNT(DISTINCT session_number) AS total_sessions FROM course_sessions
         ),
         student_attendance AS (
             SELECT
                 a.student_id,
-                COUNT(*) FILTER (WHERE a.status = 'PRESENT') AS present_count,
-                COUNT(*) FILTER (WHERE a.status = 'LATE') AS late_count,
-                COUNT(*) FILTER (WHERE a.status = 'EXCUSED') AS excused_count,
-                COUNT(*) FILTER (WHERE a.status = 'INVALID_LOCATION') AS invalid_count
+                COUNT(DISTINCT cs.session_number) FILTER (WHERE a.status = 'PRESENT') AS present_count,
+                COUNT(DISTINCT cs.session_number) FILTER (WHERE a.status = 'LATE') AS late_count,
+                COUNT(DISTINCT cs.session_number) FILTER (WHERE a.status = 'EXCUSED') AS excused_count,
+                COUNT(DISTINCT cs.session_number) FILTER (WHERE a.status = 'INVALID_LOCATION') AS invalid_count
             FROM attendance_records a
-            WHERE a.session_id IN (SELECT id FROM course_sessions)
+            JOIN course_sessions cs ON cs.id = a.session_id
             GROUP BY a.student_id
         )
         SELECT
@@ -82,6 +82,7 @@ const getStudentHistory = async (studentId, courseId = null) => {
             c.total_sessions::int AS total_sessions,
             c.max_absences::int AS max_absences,
             s.id AS session_id,
+            s.session_number,
             s.start_time,
             COALESCE(a.status, 'ABSENT') AS status,
             a.scanned_ip::text AS ip_address,

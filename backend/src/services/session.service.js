@@ -6,7 +6,7 @@ const config = require('../config/session');
 
 const openSession = async (user, courseId, data) => {
     // Chỉ ADMIN hoặc GV của lớp mới được mở phiên
-    await courseService.getManageableCourse(user, courseId);
+    const course = await courseService.getManageableCourse(user, courseId);
 
     const radiusMeters = data.radiusMeters ?? config.defaultRadiusMeters;
     const lateAfterMinutes = data.lateAfterMinutes ?? config.defaultLateAfterMinutes;
@@ -23,6 +23,15 @@ const openSession = async (user, courseId, data) => {
         throw new AppError('ip_range is required (or set SCHOOL_IP_RANGE in .env)', 400);
     }
 
+    const totalSessions = course.total_sessions || 10;
+    let sessionNumber = data.sessionNumber;
+    if (sessionNumber !== undefined && sessionNumber !== null) {
+        sessionNumber = Number(sessionNumber);
+        if (sessionNumber < 1 || sessionNumber > totalSessions) {
+            throw new AppError(`session_number must be between 1 and ${totalSessions}`, 400);
+        }
+    }
+
     // Dùng transaction để lock course, đảm bảo tính tuần tự khi xử lý đồng thời
     return withTransaction(async (db) => {
         await sessionModel.lockCourse(courseId, db);
@@ -30,6 +39,15 @@ const openSession = async (user, courseId, data) => {
         const active = await sessionModel.findActiveByCourse(courseId, db);
         if (active) {
             throw new AppError('An active session already exists for this course', 409);
+        }
+
+        // Nếu giảng viên không chọn buổi cụ thể, tự động tính buổi tiếp theo
+        if (sessionNumber === undefined || sessionNumber === null) {
+            const { rows: maxRows } = await db.query(
+                'SELECT COALESCE(MAX(session_number), 0) AS max_num FROM sessions WHERE course_id = $1',
+                [courseId]
+            );
+            sessionNumber = Math.min(totalSessions, Number(maxRows[0]?.max_num || 0) + 1);
         }
 
         const sessionId = await sessionModel.create({
@@ -40,7 +58,8 @@ const openSession = async (user, courseId, data) => {
             ipRange,
             radiusMeters,
             lateAfterMinutes,
-            durationMinutes
+            durationMinutes,
+            sessionNumber,
         }, db);
 
         // Tự động liên kết các đơn xin nghỉ phép đã được DUYỆT cho buổi học này và ghi nhận EXCUSED

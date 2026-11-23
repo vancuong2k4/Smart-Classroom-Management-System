@@ -88,24 +88,27 @@ Hệ thống thiết lập một hàng rào bảo mật 4 lớp khép kín:
 - **Quản lý lớp học phần:**
   - Cấu hình chỉ số đào tạo: Tổng số buổi học phần (`total_sessions`, mặc định 10-15 buổi) và Số buổi vắng tối đa cho phép (`max_absences`, mặc định 2 buổi).
   - Quản lý danh sách sinh viên ghi danh vào lớp (thêm/xóa hàng loạt sinh viên).
-- **Mở phiên điểm danh thông minh:**
+- **Mở phiên điểm danh thông minh theo Buổi học thực tế (Session Numbering):**
+  - Giảng viên chủ động chọn cụ thể Buổi học cần mở (Buổi 1, Buổi 2... / Tổng số buổi) với huy hiệu nhận biết buổi đã học (`✓ Đã học`), đang mở (`🔥 Đang mở`) hoặc chưa học, kèm cảnh báo khi mở lại buổi cũ.
   - Trình duyệt tự động lấy tọa độ GPS hiện tại của giảng viên qua HTML5 Geolocation (không cần nhập kinh/vĩ độ thủ công).
-  - Giảng viên chỉ cần chọn bán kính quét (ví dụ 50m) và thời gian tính đi muộn (Late).
+  - Giảng viên chọn bán kính quét (ví dụ 50m) và thời gian tính đi muộn (Late).
+  - Tự động duy trì và khôi phục phiên đang mở khi chuyển tab hoặc tải lại trang máy chiếu.
 - **Màn hình Máy chiếu QR Realtime (Projector View):**
   - Màn hình Fullscreen chuyên dụng chiếu lên bảng, tự xoay vòng mã QR mỗi 10 giây kèm thanh đếm ngược.
   - Danh sách sinh viên điểm danh thành công được cập nhật nhảy số tức thì theo thời gian thực (qua WebSockets).
 - **Duyệt Đơn xin nghỉ phép trực tuyến:**
   - Xem danh sách đơn xin nghỉ kèm lý do và ảnh minh chứng (giấy khám bệnh, giấy triệu tập...).
   - Thao tác Duyệt (`APPROVED`) hoặc Từ chối (`REJECTED`): Khi duyệt, hệ thống tự động đồng bộ buổi học đó thành trạng thái **`EXCUSED` (Nghỉ có phép)**, không tính vào số buổi vắng không phép.
-- **Thống kê & Báo cáo Điểm danh (Analytics & Warning):**
-  - Báo cáo trực quan: Có mặt (`PRESENT`), Đi muộn (`LATE`), Nghỉ có phép (`EXCUSED`), Vi phạm vị trí (`INVALID_LOCATION`), Vắng không phép (`ABSENT`).
+- **Thống kê & Báo cáo Điểm danh (Analytics & Sổ Điểm danh Chi tiết):**
+  - **Lộ trình buổi học (Roadmap Cards):** Hiển thị thẻ từng buổi học trực quan theo tiến độ học phần.
+  - **Sổ Điểm danh Chi tiết từng buổi (Modal Popup):** Click vào từng buổi học để mở danh sách 100% sinh viên lớp, phân loại 5 trạng thái: Có mặt (`PRESENT`), Đi muộn (`LATE`), Nghỉ có phép (`EXCUSED`), Vi phạm vị trí (`INVALID_LOCATION`), Vắng không phép (`ABSENT`), kèm bộ lọc nhanh, tìm kiếm sinh viên, khoảng cách GPS và IP.
   - **Cảnh báo Cấm thi tự động:** Tự động gắn nhãn đỏ **`CẤM THI`** khi `absent_count > max_absences`.
   - Xuất báo cáo bảng điểm danh ra file Excel/CSV chuẩn mã hóa UTF-8 kèm BOM.
 
 ### 3. Sinh Viên (Student) — *Mobile App*
 - **Đăng nhập & Lưu phiên an toàn:** Lưu trữ token bảo mật bằng SecureStore/Keychain.
 - **Điểm danh 1 chạm:** Mở camera quét mã QR trên máy chiếu; App tự động đính kèm GPS tọa độ thực tế, IP mạng và Device UUID để đối soát.
-- **Xem Lịch sử điểm danh:** Theo dõi chi tiết lịch sử từng môn học, thời gian quét mã, khoảng cách tới giảng viên, trạng thái điểm danh.
+- **Xem Lịch sử điểm danh theo Lộ trình:** Theo dõi chi tiết lịch sử môn học theo buổi (`[Mã môn] · Buổi X / Y`), thời gian quét mã, thời gian duyệt đơn nghỉ phép, trạng thái hiển thị huy hiệu màu đồng bộ 100% với Web (Có mặt, Đi muộn, Nghỉ có phép, Vắng, Lỗi vị trí).
 - **Gửi Đơn xin nghỉ phép trực tuyến:**
   - Chọn môn học, chọn ngày nghỉ dự kiến.
   - Nhập lý do và chụp/đính kèm ảnh minh chứng từ máy ảnh hoặc thư viện ảnh.
@@ -365,7 +368,7 @@ Dự án được xây dựng và duy trì bởi nhóm 3 thành viên:
 
 ## 📑 Tài Liệu Tham Khảo Thêm
 - Chi tiết quy tắc nghiệp vụ & coding conventions: xem [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md).
-- Nhật ký quá trình thực hiện từng Task (từ T001 đến T019): xem [`docs/tasks/README.md`](./docs/tasks/README.md).
+- Nhật ký quá trình thực hiện từng Task (từ T001 đến T022): xem [`docs/tasks/README.md`](./docs/tasks/README.md).
 
 ---
 

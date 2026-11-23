@@ -178,12 +178,18 @@ export function useAttendanceCheckin(apiUrl: string, focused: boolean) {
         throw new CheckinError('Máy chủ trả kết quả chưa xác định.');
       }
 
+      const sessionNumber = body?.data?.sessionNumber;
+      const courseName = body?.data?.courseName;
+      const sessionPrefix = sessionNumber
+        ? `Buổi ${sessionNumber}${courseName ? ` (${courseName})` : ''}: `
+        : '';
+
       setState({
         phase: 'success',
         status,
         message: status === 'LATE'
-          ? 'Bạn đã được ghi nhận đi muộn trong buổi học này.'
-          : 'Bạn đã được ghi nhận có mặt trong buổi học này.',
+          ? `${sessionPrefix}Bạn đã được ghi nhận đi muộn trong buổi học này.`
+          : `${sessionPrefix}Bạn đã được ghi nhận có mặt thành công trong buổi học này.`,
       });
       void Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
