@@ -15,9 +15,7 @@ import {
   Users,
   Calendar,
   Search,
-  X,
-  MapPin,
-  Wifi
+  X
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
