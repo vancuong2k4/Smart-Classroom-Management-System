@@ -5,7 +5,8 @@
     "port": { "ENV": "DB_PORT" },
     "user": { "ENV": "DB_USER" },
     "password": { "ENV": "DB_PASSWORD" },
-    "database": { "ENV": "DB_NAME" }
+    "database": { "ENV": "DB_NAME" },
+    "ssl": { "rejectUnauthorized": false }
   },
   "test": {
     "driver": "pg",
@@ -21,6 +22,7 @@
     "port": { "ENV": "DB_PORT" },
     "user": { "ENV": "DB_USER" },
     "password": { "ENV": "DB_PASSWORD" },
-    "database": { "ENV": "DB_NAME" }
+    "database": { "ENV": "DB_NAME" },
+    "ssl": { "rejectUnauthorized": false }
   }
 }
