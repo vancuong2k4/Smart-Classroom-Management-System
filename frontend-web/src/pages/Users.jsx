@@ -769,7 +769,7 @@ function Users() {
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: 21020050 hoặc gv_tranthu..."
+                  placeholder="VD: 221A290065 (SV) hoặc 221B290065 (GV)"
                   value={createForm.username}
                   onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', outline: 'none' }}

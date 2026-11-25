@@ -241,48 +241,19 @@ function QRProjector() {
 
   // Tự động kiểm tra phiên hoạt động mỗi khi chọn hoặc đổi lớp học phần
   useEffect(() => {
+    let isMounted = true;
     if (!selectedClass) return;
-    checkActiveSession(selectedClass);
-  }, [selectedClass, checkActiveSession]);
-
-  // Đếm ngược thời gian đổi mã (10s) và thời gian phiên chiếu
-  useEffect(() => {
-    if (!isSessionActive) return;
-
-    const timer = setInterval(() => {
-      setCountdown((prev) => (prev > 1 ? prev - 1 : 10));
-      setSessionTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleStopSession();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isSessionActive]);
-
-  // Tự động làm mới danh sách sinh viên quét mã mỗi 5 giây khi phiên đang hoạt động
-  useEffect(() => {
-    if (!isSessionActive || !currentSession?.id) return;
-
-    const interval = setInterval(() => {
-      fetchSessionRecords(currentSession.id);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [isSessionActive, currentSession?.id, fetchSessionRecords]);
-
-  // Dọn dẹp kết nối Socket khi unmount
-  useEffect(() => {
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
+    const runCheck = async () => {
+      await Promise.resolve();
+      if (isMounted) {
+        await checkActiveSession(selectedClass);
       }
     };
-  }, []);
+    runCheck();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedClass, checkActiveSession]);
 
   // Dừng / Kết thúc phiên điểm danh
   const handleStopSession = useCallback(
@@ -316,6 +287,45 @@ function QRProjector() {
     },
     [currentSession, conflictSessionId, selectedClass]
   );
+
+  // Đếm ngược thời gian đổi mã (10s) và thời gian phiên chiếu
+  useEffect(() => {
+    if (!isSessionActive) return;
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 1 ? prev - 1 : 10));
+      setSessionTimeLeft((prev) => {
+        if (prev <= 1) {
+          handleStopSession();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isSessionActive, handleStopSession]);
+
+  // Tự động làm mới danh sách sinh viên quét mã mỗi 5 giây khi phiên đang hoạt động
+  useEffect(() => {
+    if (!isSessionActive || !currentSession?.id) return;
+
+    const interval = setInterval(() => {
+      fetchSessionRecords(currentSession.id);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isSessionActive, currentSession?.id, fetchSessionRecords]);
+
+  // Dọn dẹp kết nối Socket khi unmount
+  useEffect(() => {
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, []);
 
   // Đóng phiên cũ đang xung đột và mở phiên mới ngay
   const handleForceCloseAndRestart = async () => {

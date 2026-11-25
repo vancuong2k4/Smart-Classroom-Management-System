@@ -16,8 +16,19 @@ function Layout({ onLogout }) {
   // Nếu user?.role === 'ADMIN': hiển thị Avatar "AD" và nhãn "Quản trị viên"
   // Ngược lại (hoặc là Giảng viên): hiển thị Avatar "GV" và nhãn "Giảng viên"
   const isAdmin = user?.role === 'ADMIN';
-  const avatarText = isAdmin ? 'AD' : 'GV';
   const roleLabel = isAdmin ? 'Quản trị viên' : 'Giảng viên';
+
+  // Chữ viết tắt bên trong vòng tròn avatar: ưu tiên lấy từ Họ và tên (full_name / fullName), hoặc giữ GV / AD theo role
+  let avatarText = isAdmin ? 'AD' : 'GV';
+  const nameForAvatar = (user?.full_name || user?.fullName || user?.name || '').trim();
+  if (nameForAvatar) {
+    const parts = nameForAvatar.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      avatarText = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    } else if (parts.length === 1) {
+      avatarText = parts[0].slice(0, 2).toUpperCase();
+    }
+  }
 
   const handleLogout = () => {
     if (window.confirm('Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?')) {
@@ -249,10 +260,10 @@ function Layout({ onLogout }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '13px', fontWeight: '600', color: '#081c36', lineHeight: 1.2 }}>
-                  {user?.fullName || user?.username || roleLabel}
+                  {user?.full_name || user?.fullName || user?.name || user?.username}
                 </span>
                 <span style={{ fontSize: '10px', color: '#0068ff', fontWeight: '500' }}>
-                  Mã: {user?.code || user?.username || (isAdmin ? 'AD-2026' : 'GV-2026')}
+                  Mã: {user?.username}
                 </span>
               </div>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', backgroundColor: '#e5efff', color: '#0068ff', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '600', marginLeft: '4px' }}>
